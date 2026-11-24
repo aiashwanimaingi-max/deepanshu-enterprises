@@ -67,7 +67,7 @@ dialog .bd{padding:16px;max-height:80vh;overflow:auto}
 <script>
 /* ================= data ================= */
 const KEY="deepanshuHeroDMS_v2";
-const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},fin:[],finpay:[],snap:{},wc:{},areg:[],meta:{}});
+const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},fin:[],finpay:[],snap:{},wc:{},areg:[],dupok:{},meta:{}});
 let D=EMPTY();
 try{const s=localStorage.getItem(KEY);if(s)D=Object.assign(EMPTY(),JSON.parse(s))}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){alert("Browser storage is full or blocked. Take a Backup file.")}}
@@ -114,7 +114,7 @@ function detect(rows){const h=new Set(Object.keys(rows[0]||{}));return Object.ke
 function aggregate(type,rows){
   const out={};const g=(r,k)=>r[k]??"";
   if(type==="vs")rows.forEach(r=>{const no=g(r,"Invoice No"),vin=String(g(r,"Vin No.")).trim();if(!no||!vin)return;const k=no+"|"+vin;const o=out[k]||(out[k]={no,vin,date:pDate(g(r,"Invoice Date")),cust:cname(g(r,"Customer Name"),g(r,"Customer Code")),code:String(g(r,"Customer Code")).trim(),model:String(g(r,"Model")).trim(),variant:g(r,"Variant"),cat:g(r,"Product Category"),value:N(g(r,"Value")),bill:N(g(r,"Bill Amount")),disc:N(g(r,"Line Item Discount"))+N(g(r,"Header Discount")),open:true});if(String(g(r,"Invoice Status")).trim()==="Cancelled")o.open=false});
-  if(type==="vp")rows.forEach(r=>{const vin=g(r,"Vin No");if(!vin)return;out[vin]={vin,date:pDate(g(r,"Stock In Date"))||pDate(g(r,"Invoice Date")),inv:g(r,"Invoice Number"),model:String(g(r,"Model")).trim(),desc:g(r,"SKU Description"),sup:cname(g(r,"Supplier Name"),g(r,"Supplier Code")),taxable:N(g(r,"Assessable Value")),cost:N(g(r,"Assessable Value"))+N(g(r,"CGST Amt"))+N(g(r,"SGST/UTGST Amt"))+N(g(r,"IGST Amt"))+N(g(r,"TCS Amt"))+N(g(r,"Cess Amt"))}});
+  if(type==="vp")rows.forEach(r=>{const vin=String(g(r,"Vin No")).trim();if(!vin)return;out[vin+"|"+g(r,"Invoice Number")]={vin,date:pDate(g(r,"Stock In Date"))||pDate(g(r,"Invoice Date")),inv:g(r,"Invoice Number"),model:String(g(r,"Model")).trim(),desc:g(r,"SKU Description"),sup:cname(g(r,"Supplier Name"),g(r,"Supplier Code")),taxable:N(g(r,"Assessable Value")),cost:N(g(r,"Assessable Value"))+N(g(r,"CGST Amt"))+N(g(r,"SGST/UTGST Amt"))+N(g(r,"IGST Amt"))+N(g(r,"TCS Amt"))+N(g(r,"Cess Amt"))}});
   if(type==="sv")rows.forEach(r=>{const no=g(r,"Invoice Number");if(!no)return;const o=out[no]||(out[no]={no,date:pDate(g(r,"Invoice Date")),jc:g(r,"Narration"),jt:String(g(r,"Job Card Type")).trim(),it:String(g(r,"Invoice Type")).trim(),cust:cname(g(r,"Customer Name"),g(r,"Customer Code")),labour:0,parts:0,lines:0,total:N(g(r,"Round Off Amount")),open:true,model:""});if(String(g(r,"Invoice Status")).trim()==="Cancelled"){o.open=false;return}
     const amt=N(g(r,"Retail Amount"));if(String(g(r,"JOB/PART")).trim()==="Job"){o.labour+=amt;const m=String(g(r,"SKU Name")).split("-").pop().trim();if(!o.model&&m&&m.length<25)o.model=m}else o.parts+=amt;o.lines+=amt});
   if(type==="sv")V(out).forEach(o=>{if(!o.total||Math.abs(o.total-o.lines)>Math.max(5,o.lines*.05))o.total=Math.round(o.lines);delete o.lines});
@@ -146,9 +146,10 @@ const perSel=()=>`<select onchange="per=this.value;render()">${[["t","Today"],["
 const soldVins=()=>new Set(V(D.vs).filter(s=>s.open).map(s=>s.vin));
 function sales(r){return V(D.vs).filter(s=>s.open&&(!r||inR(s.date,r)))}
 function services(r){return V(D.sv).filter(s=>s.open&&(!r||inR(s.date,r)))}
-function margin(s){const p=D.vp[s.vin];return p?s.value-p.taxable:null}
+let _vpI=null,_vpK=null;function vpOf(vin){if(_vpK!==D.vp){_vpI={};V(D.vp).forEach(p=>{const o=_vpI[p.vin];if(!o||p.date>o.date)_vpI[p.vin]=p});_vpK=D.vp}return _vpI[vin]}
+function margin(s){const p=vpOf(s.vin);return p?s.value-p.taxable:null}
 function firstSale(){const d=V(D.vs).map(s=>s.date).filter(Boolean).sort();return d[0]||""}
-function stockVehicles(){const sold=soldVins(),fs=firstSale();return V(D.vp).filter(p=>!sold.has(p.vin)).map(p=>({...p,age:diff(p.date),old:fs&&p.date<fs}))}
+function stockVehicles(){const sold=soldVins(),fs=firstSale();vpOf("");return Object.values(_vpI).filter(p=>!sold.has(p.vin)).map(p=>({...p,age:diff(p.date),old:fs&&p.date<fs}))}
 function creditBills(){return services().filter(s=>s.it==="Credit").map(s=>({...s,got:D.coll[s.no]})).sort((a,b)=>a.date.localeCompare(b.date))}
 const pending=()=>creditBills().filter(b=>!b.got);
 const months=n=>{const a=[],t=new Date();for(let i=n-1;i>=0;i--)a.push(iso(new Date(t.getFullYear(),t.getMonth()-i,1)).slice(0,7));return a};
@@ -160,9 +161,9 @@ function groupSum(a,kf,vf){const o={};a.forEach(x=>{const k=kf(x)||"Other";o[k]=
 /* ================= views ================= */
 const TABS={dash:"Dashboard",daily:"Daily",fin:"Finance",veh:"Vehicles",svc:"Service",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",money:"Money & Expenses",imp:"Import DMS files"};
 let tab="dash";
-function nav(){$("nav").innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="${k===tab?"on":""}" onclick="go('${k}')">${v}${k==="col"&&pending().length?` <span class="pill p-r">${pending().length}</span>`:""}</button>`).join("")}
+function nav(){const dn=dupScan().length;$("nav").innerHTML=Object.entries(dn?{...TABS,dup:"⚠ Duplicates"}:TABS).map(([k,v])=>`<button class="${k===tab?"on":""}" onclick="go('${k}')">${v}${k==="dup"?` <span class="pill p-r">${dn}</span>`:""}${k==="col"&&pending().length?` <span class="pill p-r">${pending().length}</span>`:""}</button>`).join("")}
 function go(t){tab=t;nav();render();scrollTo(0,0)}
-function render(){({wcl,dash,daily,fin,veh,svc,acc,col,parts,money,imp})[tab]()}
+function render(){if(tab==="dup"&&!dupScan().length)tab="dash";({dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,money,imp})[tab]()}
 const noData=()=>!Object.keys(D.vs).length&&!Object.keys(D.sv).length&&!Object.keys(D.vp).length;
 
 function dash(){
@@ -184,7 +185,7 @@ function dash(){
   const modM=groupSum(withM,s=>s.model,s=>margin(s)).slice(0,6);
   const expH=groupSum(EX.filter(x=>x.type==="out"),x=>x.head,x=>x.amt).slice(0,6);
   $("app").innerHTML=`
-  <div class="row" style="justify-content:space-between"><h2 style="margin:4px 0">Business at a glance</h2>${perSel()}</div>
+  ${dupScan().length?`<div class="card click" onclick="go('dup')" style="border-color:var(--red);background:#fff5f5;margin-bottom:10px"><b class="neg">⚠ ${dupScan().length} double entries found</b> – check करने के लिए यहाँ दबाएँ</div>`:""}<div class="row" style="justify-content:space-between"><h2 style="margin:4px 0">Business at a glance</h2>${perSel()}</div>
   <div class="grid">
     <div class="card stat click" onclick="go('veh')"><div class="l">Vehicle sales</div><div class="n">${lakh(vsale)}</div><div class="s">${S.length} vehicles</div></div>
     <div class="card stat click" onclick="go('svc')"><div class="l">Service billing</div><div class="n">${lakh(svc)}</div><div class="s">${J.length} job cards</div></div>
@@ -218,6 +219,63 @@ function dash(){
 
 
 
+
+
+
+/* ---------- STAFF MODE: finance entry only ---------- */
+let STAFF=false,SF=[];
+function staffStart(){STAFF=true;try{localStorage.removeItem(KEY)}catch(e){}D=EMPTY();$("nav").innerHTML="";document.querySelectorAll("header .btn.g").forEach(b=>{if(b.id!=="logoutBtn")b.style.display="none"});
+  document.querySelector("header small").textContent="Finance entry";
+  const {F}=FB;UNSUB.push(F.onSnapshot(F.query(C_("fin"),F.where("by","==",ME)),snap=>{SF=snap.docs.map(d=>d.data()).sort((a,b)=>(b.date||"").localeCompare(a.date||""));setSync("☁ "+ME);staffUI()},e=>{UNSUB.forEach(u=>{try{u()}catch(x){}});UNSUB=[];screen(`<h2 style="margin-top:0">Access not given</h2><p><b>${esc(ME)}</b> को अभी इजाज़त नहीं है। Owner से कहें कि आपका email Firebase Rules में "Staff" में जोड़ें।</p><button class="btn" onclick="logout()">Logout</button>`)}))}
+function staffUI(eid){if(dlg.open)return;const e=SF.find(x=>x.id===eid)||{date:today()};
+  $("app").innerHTML=`<div class="card" style="max-width:560px;margin:0 auto"><h2 style="margin-top:0">${eid?"Edit finance entry":"New finance entry"}</h2>
+  <datalist id="coL">${COS.map(c=>`<option>${esc(c)}</option>`).join("")}</datalist>
+  <div class="form"><div><label>Invoice no. (sale bill) *</label><input id="s_inv" value="${esc(e.inv)}" placeholder="e.g. 66115BK26S609"></div>
+  <div><label>Customer name *</label><input id="s_cust" value="${esc(e.cust)}"></div>
+  <div><label>Finance company *</label><input id="s_co" list="coL" value="${esc(e.co)}"></div>
+  <div><label>Finance amount ₹ *</label><input id="s_amt" type="number" inputmode="numeric" value="${e.amt||""}"></div>
+  <div><label>Date</label><input id="s_date" type="date" value="${e.date}"></div>
+  <div><label>Note (loan no. etc.)</label><input id="s_note" value="${esc(e.note)}"></div></div>
+  <div class="row" style="margin-top:12px"><button class="btn" onclick="staffSave('${eid||""}')">Save</button>${eid?`<button class="btn g" onclick="staffUI()">Cancel</button>`:""}</div></div>
+  <h2 style="max-width:560px;margin:20px auto 8px">My entries (${SF.length})</h2>
+  <div style="max-width:560px;margin:0 auto">${SF.length?SF.map(x=>`<div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;gap:8px;align-items:center"><div><b>${esc(x.cust)}</b> · ${esc(x.inv)}<div class="muted">${esc(x.co)} · ${rs(x.amt)} · ${fd(x.date)}</div></div>${x.status==="done"?`<span class="pill p-ok">Adjusted</span>`:`<button class="btn g s" onclick="staffUI('${x.id}')">Edit</button>`}</div>`).join(""):`<div class="card empty">No entries yet.</div>`}</div>`}
+function staffSave(eid){const v={inv:$("s_inv").value.trim().toUpperCase(),cust:$("s_cust").value.trim(),co:$("s_co").value.trim(),amt:N($("s_amt").value),date:$("s_date").value||today(),note:$("s_note").value.trim()};
+  if(!v.inv||!v.cust||!v.co||!v.amt)return alert("Invoice no., customer, company और amount ज़रूरी हैं");
+  if(!dupOK(SF.filter(x=>x.id!==eid&&(nz(x.inv)===nz(v.inv)||(nz(x.cust)===nz(v.cust)&&nz(x.co)===nz(v.co)&&Math.abs(N(x.amt)-v.amt)<1))).map(x=>`${x.inv} · ${x.cust} · ${x.co} · ${rs(x.amt)}`)))return;
+  const old=SF.find(x=>x.id===eid);const x={id:eid||uid(),inv:v.inv,cust:v.cust,model:old?.model||"",co:v.co,amt:v.amt,date:v.date,status:"pending",doneDate:"",note:v.note};
+  setSync("⏳ Saving…");FB.F.setDoc(R_("fin",sid(x.id)),{...x,by:ME}).then(()=>{setSync("☁ Saved");alert("Saved ✓")},e=>alert("Not saved: "+(e.code||e.message)));staffUI()}
+
+/* ---------- double-entry detection ---------- */
+const nz=x=>String(x||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+function dupOK(list){if(!list.length)return true;return confirm("⚠ DOUBLE ENTRY?\n\nऐसी entry पहले से है:\n• "+list.slice(0,5).join("\n• ")+(list.length>5?`\n… +${list.length-5} more`:"")+"\n\nफिर भी save करें?  (OK = हाँ, Cancel = नहीं)")}
+function aregOfDms(no){return D.areg.find(r=>{const d=r.inv?svByV(r.inv,r.invDate):null;return d&&d.no===no})}
+function aregDups(v,id){const dv=v.inv?svByV(v.inv,v.invDate):null;return D.areg.filter(r=>{if(r.id===id)return false;const dr=r.inv?svByV(r.inv,r.invDate):null;
+  if(dv&&dr&&dv.no===dr.no)return true;if(!dv&&v.inv&&nz(r.inv)===nz(v.inv)&&Math.abs(new Date(r.invDate||r.date)-new Date(v.invDate||v.date))<40*864e5)return true;
+  if(nz(v.job)&&nz(r.job)===nz(v.job)&&(nz(v.reg)&&nz(r.reg)===nz(v.reg)||nz(r.cust)===nz(v.cust)))return true;return false})}
+function grp(list,kf){const m={};list.forEach(x=>{const k=kf(x);if(k)(m[k]=m[k]||[]).push(x)});return Object.entries(m).filter(([,a])=>a.length>1)}
+let _dsK=null,_dsV=null;
+function dupScan(all){
+  const G=[],add=(type,k,title,items,sev)=>{const key=type+":"+k;if(all||!D.dupok[key])G.push({key,type,title,items,sev,ok:!!D.dupok[key]})};
+  grp(sales(),s=>s.vin).forEach(([k,a])=>add("vs",k,`Vehicle sold twice – VIN ${k}`,a.map(s=>({t:`${fd(s.date)} · ${s.no} · ${s.cust} · ${rs(s.bill)}`})),"high"));
+  grp(V(D.vp),p=>p.vin).forEach(([k,a])=>add("vp",k,`Vehicle purchased twice – VIN ${k} (${a[0].model})`,a.map(p=>({t:`${fd(p.date)} · invoice ${p.inv} · ${rs(p.cost)}`})),"high"));
+  grp(services(),j=>j.jc?nz(j.jc):"").forEach(([k,a])=>add("jc",k,`Same job card billed twice – ${a[0].jc}`,a.map(j=>({t:`${fd(j.date)} · ${j.no} · ${j.jt} · ${rs(j.total)}`})),"check"));
+  const ar=D.areg.map(r=>({r,d:r.inv?svByV(r.inv,r.invDate):null}));
+  grp(ar,x=>x.d?x.d.no:"").forEach(([k,a])=>add("areg-inv",k,`Accident register: same bill ${k} entered ${a.length} times`,a.map(x=>({t:`${x.r.cust} · ${x.r.reg||""} · job ${x.r.job||"-"} · ${rs(x.r.amt)}`,id:x.r.id,c:"areg"})),"high"));
+  grp(D.areg,r=>nz(r.job)&&nz(r.reg)?nz(r.job)+"|"+nz(r.reg):"").forEach(([k,a])=>add("areg-job",k,`Accident register: same vehicle & job no. (${a[0].reg} · job ${a[0].job})`,a.map(r=>({t:`${r.cust} · ${r.inv||"no invoice"} · ${fd(r.invDate||r.date)} · ${rs(r.amt)}`,id:r.id,c:"areg"})),"high"));
+  grp(D.fin,f=>f.inv||"").forEach(([k,a])=>add("fin-inv",k,`Finance: same sale ${k} entered ${a.length} times`,a.map(f=>({t:`${f.cust} · ${f.co} · ${rs(f.amt)}`,id:f.id,c:"fin"})),"high"));
+  grp(D.fin,f=>nz(f.cust)+"|"+nz(f.co)+"|"+Math.round(N(f.amt))).forEach(([k,a])=>add("fin-same",k,`Finance: same customer, company & amount – ${a[0].cust}`,a.map(f=>({t:`${fd(f.date)} · ${f.co} · ${rs(f.amt)} · ${f.inv||""}`,id:f.id,c:"fin"})),"high"));
+  grp(D.finpay,x=>nz(x.co)+"|"+x.date+"|"+Math.round(N(x.amt))).forEach(([k,a])=>add("finpay",k,`Finance money entered twice – ${a[0].co} ${rs(a[0].amt)} on ${fd(a[0].date)}`,a.map(x=>({t:`${x.kind} · ${x.note||""}`,id:x.id,c:"finpay"})),"high"));
+  grp(D.exp,e=>e.type+"|"+e.date+"|"+Math.round(N(e.amt))+"|"+nz(e.head)).forEach(([k,a])=>add("exp",k,`Money entry twice – ${a[0].head} ${rs(a[0].amt)} on ${fd(a[0].date)}`,a.map(e=>({t:`${e.mode||""} · ${e.note||""}`,id:e.id,c:"exp"})),"high"));
+  return G}
+function sig(){return D.areg.length+"|"+D.fin.length+"|"+D.finpay.length+"|"+D.exp.length+"|"+Object.keys(D.dupok).length}
+function dupDel(c,id){if(!confirm("यह entry delete करें?"))return;D[c]=D[c].filter(x=>x.id!==id);save();cDel(c,id);nav();render()}
+function dupIgnore(key){D.dupok[key]=1;save();cPut("dupok",key,{key});nav();render()}
+function dup(){const L=dupScan();
+  $("app").innerHTML=`<div class="note" style="margin-bottom:12px">⚠ ऐप ने ये <b>${L.length}</b> जगह double entry पकड़ी हैं। जो सच में double है उसे <b>Delete</b> करें; जो सही है (दो अलग काम) उस पर <b>"Not a duplicate"</b> दबाएँ, फिर वह दोबारा नहीं दिखेगी।</div>
+  ${L.map(g=>`<div class="card" style="margin-bottom:10px;border-color:${g.sev==="high"?"var(--red)":"var(--amber)"}"><div class="row" style="justify-content:space-between;margin:0"><b>${esc(g.title)}</b><button class="btn g s" onclick="dupIgnore('${esc(g.key)}')">Not a duplicate</button></div>
+   ${g.type==="vp"?`<p class="muted" style="margin:4px 0">एक ही गाड़ी के दो purchase bill हैं। Distributor से पूछें कि दूसरे bill का credit note आया या नहीं — वरना पैसा दो बार कट रहा है।</p>`:g.type==="jc"?`<p class="muted" style="margin:4px 0">एक job card पर दो bill बने हैं — जाँच लें कि दोनों सही हैं।</p>`:""}
+   ${g.items.map(it=>`<div class="row" style="margin:6px 0;justify-content:space-between"><span>• ${esc(it.t)}</span>${it.c?`<span>${it.c==="areg"?`<button class="btn g s" onclick="aregForm('${it.id}')">Open</button> `:it.c==="fin"?`<button class="btn g s" onclick="finForm('${it.id}')">Open</button> `:it.c==="finpay"?`<button class="btn g s" onclick="payForm('${it.id}')">Open</button> `:""}<button class="btn g s" onclick="dupDel('${it.c}','${it.id}')">Delete</button></span>`:""}</div>`).join("")}</div>`).join("")||`<div class="card empty">No double entries 👍</div>`}`;
+}
 
 /* ---------- warranty claims ---------- */
 let wcF="H",wq="";
@@ -300,7 +358,8 @@ function daily(){
 /* ---------- finance (company advances & files) ---------- */
 const COS=["Hero FinCorp","IDFC First Bank","Bajaj Finance","Muthoot","HDB Financial","L&T Finance"];
 let fco="",fst="pending",fq="";
-const finOf=no=>D.fin.find(f=>f.inv&&f.inv===no);
+function saleNo(t){t=String(t||"").trim().toUpperCase();if(!t)return"";if(D.vs&&V(D.vs).some(x=>x.no===t))return t;const m=V(D.vs).filter(x=>x.open&&(x.no.endsWith(t)||x.no.endsWith("S"+t.replace(/^S/,""))));return m.length===1?m[0].no:t}
+const finOf=no=>D.fin.find(f=>f.inv&&saleNo(f.inv)===no);
 function coList(){return[...new Set([...D.fin.map(f=>f.co),...D.finpay.map(p=>p.co)].filter(Boolean))]}
 function coAcc(co){const F=D.fin.filter(f=>f.co===co),P=D.finpay.filter(p=>p.co===co);
   const recd=sum(P,p=>p.amt),done=sum(F.filter(f=>f.status==="done"),f=>f.amt),pend=F.filter(f=>f.status!=="done");
@@ -319,14 +378,14 @@ function fin(){
   <div class="row" style="margin-top:12px"><span class="seg">${[["pending","Pending files"],["done","Adjusted"],["all","All"]].map(([v,l])=>`<button class="${fst===v?"on":""}" onclick="fst='${v}';fin()">${l}</button>`).join("")}</span>
   <select onchange="fco=this.value;fin()"><option value="">All companies</option>${cos.map(c=>`<option ${c===fco?"selected":""}>${esc(c)}</option>`).join("")}</select>
   <input placeholder="Search customer / model" value="${esc(fq)}" oninput="fq=this.value;fin();refocus(this)"></div>
-  ${table(["File date","Days","Customer","Vehicle","Company","Loan amount","Status",""],L.map(f=>[fd(f.date),f.status==="done"?"":`<span class="pill ${diff(f.date)>15?"p-r":"p-w"}">${diff(f.date)}</span>`,`<b>${esc(f.cust)}</b>${f.inv?`<div class="muted">${esc(f.inv)}</div>`:""}`,esc(f.model),esc(f.co),{n:rs(f.amt)},f.status==="done"?`<span class="pill p-ok">Adjusted ${fd(f.doneDate)}</span>`:`<button class="btn s" onclick="markFin('${f.id}')">Mark adjusted</button>`,`<button class="btn g s" onclick="finForm('${f.id}')">Edit</button>`]),L.length)}`;
+  ${table(["File date","Days","Customer","Vehicle","Company","Loan amount","Status","Entered by",""],L.map(f=>[fd(f.date),f.status==="done"?"":`<span class="pill ${diff(f.date)>15?"p-r":"p-w"}">${diff(f.date)}</span>`,`<b>${esc(f.cust)}</b>${f.inv?`<div class="muted">${esc(f.inv)}</div>`:""}`,esc(f.model),esc(f.co),{n:rs(f.amt)},f.status==="done"?`<span class="pill p-ok">Adjusted ${fd(f.doneDate)}</span>`:`<button class="btn s" onclick="markFin('${f.id}')">Mark adjusted</button>`,`<span class="muted">${esc(String(f.by||"").split("@")[0])}</span>`,`<button class="btn g s" onclick="finForm('${f.id}')">Edit</button>`]),L.length)}`;
 }
 function coInput(v){return `<datalist id="coL">${[...new Set([...coList(),...COS])].map(c=>`<option>${esc(c)}</option>`).join("")}</datalist><input id="f_co" list="coL" value="${esc(v||"")}" placeholder="e.g. Hero FinCorp">`}
 function finForm(id,inv){
   const f=D.fin.find(x=>x.id===id)||(()=>{const s=V(D.vs).find(x=>x.no===inv&&x.open);return s?{inv:s.no,date:s.date,cust:s.cust,model:s.model,vin:s.vin,co:fco||"",status:"pending"}:{date:today(),status:"pending",co:fco||""}})();
-  const opts=sales().filter(s=>!finOf(s.no)||s.no===f.inv).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,300);
+  const opts=sales().filter(s=>!finOf(s.no)||s.no===saleNo(f.inv)).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,300);
   open(id?"Edit finance file":"New finance file",`<div class="form">
-  <div style="grid-column:1/-1"><label>Sale (from DMS)</label><select id="f_inv" onchange="const s=V(D.vs).find(x=>x.no===this.value);if(s){$('f_cust').value=s.cust;$('f_model').value=s.model;$('f_date').value=s.date}"><option value="">— not in list / type below —</option>${opts.map(s=>`<option value="${esc(s.no)}" ${s.no===f.inv?"selected":""}>${fd(s.date)} · ${esc(s.cust)} · ${esc(s.model)}</option>`).join("")}</select></div>
+  <div style="grid-column:1/-1"><label>Sale (from DMS)</label><select id="f_inv" data-raw="${esc(f.inv||"")}" onchange="const s=V(D.vs).find(x=>x.no===this.value);if(s){$('f_cust').value=s.cust;$('f_model').value=s.model;$('f_date').value=s.date}"><option value="">— not in list / type below —</option>${f.inv&&!opts.some(s=>s.no===saleNo(f.inv))?`<option value="${esc(f.inv)}" selected>${esc(f.inv)} (typed by staff)</option>`:""}${opts.map(s=>`<option value="${esc(s.no)}" ${s.no===saleNo(f.inv)?"selected":""}>${fd(s.date)} · ${esc(s.cust)} · ${esc(s.model)}</option>`).join("")}</select></div>
   <div><label>Customer</label><input id="f_cust" value="${esc(f.cust)}"></div><div><label>Model</label><input id="f_model" value="${esc(f.model)}"></div>
   <div><label>Finance company</label>${coInput(f.co)}</div><div><label>Loan / finance amount ₹</label><input id="f_amt" type="number" value="${f.amt||""}"></div>
   <div><label>File date</label><input id="f_date" type="date" value="${f.date}"></div>
@@ -335,6 +394,7 @@ function finForm(id,inv){
   <div class="row" style="margin-top:12px"><button class="btn" onclick="saveFin('${id||""}')">Save</button>${id?`<button class="btn g" style="margin-left:auto" onclick="delFin('${id}')">Delete</button>`:""}</div>`);
 }
 function saveFin(id){const v={inv:$("f_inv").value,cust:$("f_cust").value.trim(),model:$("f_model").value.trim(),co:$("f_co").value.trim(),amt:N($("f_amt").value),date:$("f_date").value,status:$("f_st").value,doneDate:$("f_dd").value,note:$("f_note").value.trim()};
+  if(!dupOK(D.fin.filter(f=>f.id!==id&&((v.inv&&f.inv===v.inv)||(nz(f.cust)===nz(v.cust)&&nz(f.co)===nz(v.co)&&Math.abs(N(f.amt)-v.amt)<1))).map(f=>`${f.cust} · ${f.co} · ${rs(f.amt)} · ${fd(f.date)}`)))return;
   if(!v.co||!v.amt||!v.cust)return alert("Customer, finance company and amount are needed");if(v.status==="done"&&!v.doneDate)v.doneDate=today();if(v.status!=="done")v.doneDate="";
   const s=v.inv&&V(D.vs).find(x=>x.no===v.inv);if(s)v.vin=s.vin;
   const x=id?Object.assign(D.fin.find(e=>e.id===id),v):{id:uid(),...v};if(!id)D.fin.push(x);save();cPut("fin",x.id,x);dlg.close();render()}
@@ -347,6 +407,7 @@ function payForm(id){const p=D.finpay.find(x=>x.id===id)||{date:today(),co:fco||
   <p class="muted">"Charges cut by company" = processing fee / subvention जो company ने काट ली — वह भी file का हिसाब पूरा करती है।</p>
   <div class="row"><button class="btn" onclick="savePay('${id||""}')">Save</button>${id?`<button class="btn g" style="margin-left:auto" onclick="if(confirm('Delete?')){D.finpay=D.finpay.filter(e=>e.id!=='${id}');save();cDel('finpay','${id}');dlg.close();render()}">Delete</button>`:""}</div>`)}
 function savePay(id){const v={co:$("f_co").value.trim(),kind:$("p_k").value,amt:N($("p_a").value),date:$("p_d").value,note:$("p_n").value.trim()};if(!v.co||!v.amt)return alert("Company and amount are needed");
+  if(!dupOK(D.finpay.filter(x=>x.id!==id&&nz(x.co)===nz(v.co)&&x.date===v.date&&Math.abs(N(x.amt)-v.amt)<1).map(x=>`${x.co} · ${x.kind} · ${rs(x.amt)} · ${fd(x.date)}`)))return;
   const x=id?Object.assign(D.finpay.find(e=>e.id===id),v):{id:uid(),...v};if(!id)D.finpay.push(x);save();cPut("finpay",x.id,x);dlg.close();render()}
 function ledger(co){
   const rows=[...D.finpay.filter(p=>p.co===co).map(p=>({date:p.date,t:p.kind+(p.note?" · "+p.note:""),cr:p.amt,id:p.id,pay:1})),...D.fin.filter(f=>f.co===co&&f.status==="done").map(f=>({date:f.doneDate||f.date,t:"File adjusted · "+f.cust+" · "+f.model,dr:f.amt,id:f.id}))].sort((a,b)=>a.date.localeCompare(b.date));
@@ -365,7 +426,7 @@ function veh(){
     const byM=groupSum(S,s=>s.model,()=>1);
     $("app").innerHTML=head+`<div class="grid"><div class="card stat"><div class="l">Vehicles sold</div><div class="n">${S.length}</div></div><div class="card stat"><div class="l">Sale value</div><div class="n">${lakh(sum(S,s=>s.bill))}</div></div><div class="card stat"><div class="l">Margin (ex-GST)</div><div class="n pos">${lakh(mg)}</div><div class="s">avg ${rs(wm.length?mg/wm.length:0)}</div></div><div class="card stat"><div class="l">Discount given</div><div class="n neg">${lakh(sum(S,s=>s.disc))}</div></div><div class="card stat"><div class="l">Sold below ₹1,000 margin</div><div class="n ${low.length?"neg":""}">${low.length}</div></div></div>
     <div class="g2" style="margin:12px 0"><div class="card"><h3>Models sold</h3>${bars(byM.slice(0,8),v=>v+" pcs")}</div><div class="card"><h3>Margin per vehicle by model</h3>${bars(groupSum(wm,s=>s.model,margin).map(([k,v])=>[k,v/wm.filter(s=>s.model===k).length]).sort((a,b)=>b[1]-a[1]).slice(0,8),rs,"var(--green)")}</div></div>
-    ${table(["Date","Invoice","Customer","Model","VIN","Sale (with GST)","Discount","Purchase cost","Margin ex-GST","Finance"],S.slice(0,400).map(s=>{const p=D.vp[s.vin],m=margin(s),fl=finOf(s.no);return[fd(s.date),esc(s.no),esc(s.cust),esc(s.model),`<span class="muted">${esc(s.vin)}</span>`,{n:rs(s.bill)},{n:s.disc?rs(s.disc):""},{n:p?rs(p.cost):"–"},{n:m===null?"–":`<span class="${m<1000?"neg":"pos"}">${rs(m)}</span>`},fl?`<span class="pill ${fl.status==="done"?"p-ok":"p-w"}" style="cursor:pointer" onclick="finForm('${fl.id}')">${esc(fl.co)} ${fl.status==="done"?"✓":"pending"}</span>`:`<button class="btn g s" onclick="finForm(null,'${esc(s.no)}')">+ Finance</button>`]}),S.length)}`;
+    ${table(["Date","Invoice","Customer","Model","VIN","Sale (with GST)","Discount","Purchase cost","Margin ex-GST","Finance"],S.slice(0,400).map(s=>{const p=vpOf(s.vin),m=margin(s),fl=finOf(s.no);return[fd(s.date),esc(s.no),esc(s.cust),esc(s.model),`<span class="muted">${esc(s.vin)}</span>`,{n:rs(s.bill)},{n:s.disc?rs(s.disc):""},{n:p?rs(p.cost):"–"},{n:m===null?"–":`<span class="${m<1000?"neg":"pos"}">${rs(m)}</span>`},fl?`<span class="pill ${fl.status==="done"?"p-ok":"p-w"}" style="cursor:pointer" onclick="finForm('${fl.id}')">${esc(fl.co)} ${fl.status==="done"?"✓":"pending"}</span>`:`<button class="btn g s" onclick="finForm(null,'${esc(s.no)}')">+ Finance</button>`]}),S.length)}`;
   }else{
     const all=stockVehicles().filter(p=>(p.model+p.vin+p.desc).toLowerCase().includes(vq.toLowerCase())).sort((a,b)=>b.age-a.age);
     const st=all.filter(x=>!x.old),old=all.filter(x=>x.old);
@@ -433,13 +494,13 @@ function acc(){
 }
 async function loadAregSeed(){const have=new Set(D.areg.map(r=>{const d=r.inv?svByV(r.inv,r.invDate):null;return d?d.no:"x"+r.cust+r.job}));const xs=AREG_SEED.map(r=>{const x={id:uid(),...r,insName:r.ins};delete x.ins;return x}).filter(x=>{const d=x.inv?svByV(x.inv,x.invDate):null;return !have.has(d?d.no:"x"+x.cust+x.job)});if(!xs.length)return alert("Register already loaded.");D.areg.push(...xs);save();acc();
   if(FB){setSync("⏳ Saving…");try{const b=FB.F.writeBatch(FB.db);xs.forEach(x=>b.set(R_("areg",sid(x.id)),{...x,by:ME}));await b.commit();setSync("☁ Synced · "+ME)}catch(e){cErr(e)}}}
-function aregFromDms(no){const s=D.sv[no];aregForm(null,{cust:s.cust,date:s.date,inv:no,invDate:s.date,amt:s.total,job:String(s.jc||"").split("-").pop(),insName:s.it==="Credit"?s.cust:""})}
+function aregFromDms(no){const ex=aregOfDms(no);if(ex){alert("यह bill पहले से register में है – वही entry खुल रही है।");return aregForm(ex.id)}const s=D.sv[no];aregForm(null,{cust:s.cust,date:s.date,inv:no,invDate:s.date,amt:s.total,job:String(s.jc||"").split("-").pop(),insName:s.it==="Credit"?s.cust:""})}
 function aregForm(id,pre){const x=D.areg.find(e=>e.id===id)||pre||{date:today()};
   open(id?"Edit accident job":"New accident job",`<datalist id="insL">${INSL.map(i=>`<option>${i}</option>`).join("")}</datalist><div class="form">
   ${[["cust","Customer"],["reg","Reg. no."],["job","Job no."],["date","Job date","date"],["estimate","Estimate amount ₹","number"],["insName","Insurance company","",'list="insL"'],["claimNo","Claim no."],["surveyor","Surveyor"],["inv","Invoice no. (V-…)"],["invDate","Invoice date","date"],["amt","Total bill ₹","number"],["custShare","Customer pays ₹ (his share)","number"],["insRecd","Received from company ₹","number"],["insDate","Company paid on (settled)","date"],["mech","Mechanic"],["remarks","Remarks"]].map(([k,l,t,a])=>`<div><label>${l}</label><input id="a_${k}" ${t?`type="${t}"`:""} ${a||""} value="${esc(x[k]??(k==="insName"?x.ins:"")??"")}"></div>`).join("")}</div>
   ${x.note?`<p class="muted">Note: ${esc(x.note)}</p>`:""}
   <div class="row" style="margin-top:12px"><button class="btn" onclick="saveAreg('${id||""}')">Save</button>${id?`<button class="btn g" style="margin-left:auto" onclick="if(confirm('Delete?')){D.areg=D.areg.filter(e=>e.id!=='${id}');save();cDel('areg','${id}');dlg.close();render()}">Delete</button>`:""}</div>`)}
-function aregPaidDms(no){const s=D.sv[no];const x={id:uid(),cust:s.cust,date:s.date,inv:no,invDate:s.date,amt:s.total,job:String(s.jc||"").split("-").pop(),insName:s.it==="Credit"?insNorm(s.cust):""};D.areg.push(x);save();cPut("areg",x.id,x);aregPaid(x.id)}
+function aregPaidDms(no){const ex=aregOfDms(no);if(ex)return aregPaid(ex.id);const s=D.sv[no];const x={id:uid(),cust:s.cust,date:s.date,inv:no,invDate:s.date,amt:s.total,job:String(s.jc||"").split("-").pop(),insName:s.it==="Credit"?insNorm(s.cust):""};D.areg.push(x);save();cPut("areg",x.id,x);aregPaid(x.id)}
 function aregPaid(id){const x=accRows().find(e=>e.id===id)||D.areg.find(e=>e.id===id);const amt=x.amt||0;
   open("Payment – "+x.cust,`<p>Total bill: <b>${rs(amt)}</b> · ${esc(x.insW||x.insName||"")} · ${esc(x.inv||"")}</p>
   <div class="form"><div><label>Customer pays ₹ (his share)</label><input id="q_s" type="number" value="${Math.max(N(x.custShare),N(x.custRecd))||""}" oninput="qCalc(${amt})"></div>
@@ -452,7 +513,7 @@ function qCalc(amt){const sh=N($("q_s").value),due=Math.max(0,amt-sh),a=$("q_a")
 function qSave(id){const r=D.areg.find(e=>e.id===id);r.custShare=N($("q_s").value);r.custRecd=r.custShare;
   if($("q_a").value!==""){r.insRecd=N($("q_a").value);r.insDate=$("q_t").value||today();if($("q_u").value)r.remarks=((r.remarks||"")+" UTR "+$("q_u").value).trim()}
   save();cPut("areg",r.id,r);dlg.close();render()}
-function saveAreg(id){const v={};["cust","reg","job","date","estimate","insName","claimNo","surveyor","inv","invDate","custShare","amt","insRecd","insDate","mech","remarks"].forEach(k=>v[k]=$("a_"+k).value.trim());["amt","insRecd","custShare","estimate"].forEach(k=>v[k]=N(v[k]));v.custRecd=v.custShare;if(v.insRecd&&!v.insDate&&!confirm("Company से पूरा पैसा आ गया (claim settled)? OK = हाँ, तारीख आज की लगेगी"))0;else if(v.insRecd&&!v.insDate)v.insDate=today();
+function saveAreg(id){const v={};["cust","reg","job","date","estimate","insName","claimNo","surveyor","inv","invDate","custShare","amt","insRecd","insDate","mech","remarks"].forEach(k=>v[k]=$("a_"+k).value.trim());["amt","insRecd","custShare","estimate"].forEach(k=>v[k]=N(v[k]));v.custRecd=v.custShare;if(!dupOK(aregDups(v,id).map(r=>`${r.cust} · ${r.reg||""} · job ${r.job||"-"} · ${r.inv||""} · ${rs(r.amt)}`)))return;if(v.insRecd&&!v.insDate&&!confirm("Company से पूरा पैसा आ गया (claim settled)? OK = हाँ, तारीख आज की लगेगी"))0;else if(v.insRecd&&!v.insDate)v.insDate=today();
   if(!v.cust)return alert("Customer name needed");const x=id?Object.assign(D.areg.find(e=>e.id===id),v):{id:uid(),...v};if(!id)D.areg.push(x);save();cPut("areg",x.id,x);dlg.close();render()}
 
 /* ---------- to collect ---------- */
@@ -498,7 +559,8 @@ function money(){
 function expForm(type,id){const x=D.exp.find(e=>e.id===id)||{date:today(),type,mode:"Cash",head:HEADS[type][0]};
   open(x.type==="in"?"Money in":"Expense / payment",`<datalist id="hd">${HEADS[x.type].map(h=>`<option>${h}</option>`).join("")}</datalist><div class="form"><div><label>Date</label><input id="e_date" type="date" value="${x.date}"></div><div><label>Head</label><input id="e_head" list="hd" value="${esc(x.head)}"></div><div><label>Amount ₹</label><input id="e_amt" type="number" value="${x.amt||""}"></div><div><label>Mode</label><select id="e_mode">${["Cash","Bank","UPI"].map(m=>`<option ${m===x.mode?"selected":""}>${m}</option>`).join("")}</select></div><div><label>Party / details</label><input id="e_note" value="${esc(x.note)}"></div></div>
   <div class="row" style="margin-top:12px"><button class="btn" onclick="saveExp('${x.type}','${id||""}')">Save</button>${id?`<button class="btn g" style="margin-left:auto" onclick="delExp('${id}')">Delete</button>`:""}</div>`)}
-function saveExp(type,id){const v={type,date:$("e_date").value,head:$("e_head").value.trim(),amt:N($("e_amt").value),mode:$("e_mode").value,note:$("e_note").value.trim()};if(!v.amt||!v.date)return alert("Enter date and amount");const x=id?Object.assign(D.exp.find(e=>e.id===id),v):{id:uid(),...v};if(!id)D.exp.push(x);save();cPut("exp",x.id,x);dlg.close();render()}
+function saveExp(type,id){const v={type,date:$("e_date").value,head:$("e_head").value.trim(),amt:N($("e_amt").value),mode:$("e_mode").value,note:$("e_note").value.trim()};if(!v.amt||!v.date)return alert("Enter date and amount");
+  if(!dupOK(D.exp.filter(e=>e.id!==id&&e.type===v.type&&e.date===v.date&&Math.abs(N(e.amt)-v.amt)<1&&nz(e.head)===nz(v.head)).map(e=>`${fd(e.date)} · ${e.head} · ${rs(e.amt)} · ${e.note||""}`)))return;const x=id?Object.assign(D.exp.find(e=>e.id===id),v):{id:uid(),...v};if(!id)D.exp.push(x);save();cPut("exp",x.id,x);dlg.close();render()}
 
 /* ---------- import ---------- */
 function imp(){
@@ -509,7 +571,7 @@ function imp(){
   <div class="card"><h3>Reports this app reads</h3>
   ${table(["Report (DMS export)","Rows in app","Last import"],Object.entries(REPORTS).map(([k,v])=>[esc(v.name),{n:k==="stock"?D.stock.length:Object.keys(D[k]).length},D.meta[k]?`${fd(D.meta[k].at)} <span class="muted">${esc(D.meta[k].from)}–${esc(D.meta[k].to)}</span>`:`<span class="muted">not yet</span>`]))}
   <p class="muted">The same invoice / VIN is updated, never doubled — so every week you can export from 1 April and import again. Parts Stock is replaced with the latest file.</p>
-  ${FB?`<p class="muted">Database: <b>${esc(fbCfg().projectId)}</b> · login ${esc(ME)}</p>${FB_CONFIG?"":`<button class="btn g s" onclick="if(confirm('Disconnect this device from this database? Cloud data is not deleted.')){localStorage.removeItem(FBK);logout()}">Change database</button> `}${rulesBox(ME)}`:""}<button class="btn g s" onclick="clearDMS()">Clear DMS data</button></div></div>`;
+  ${FB?`<p class="muted">Database: <b>${esc(fbCfg().projectId)}</b> · login ${esc(ME)}</p>${FB_CONFIG?"":`<button class="btn g s" onclick="if(confirm('Disconnect this device from this database? Cloud data is not deleted.')){localStorage.removeItem(FBK);logout()}">Change database</button> `}${rulesBox(ME,"")}`:""}<button class="btn g s" onclick="clearDMS()">Clear DMS data</button></div></div>`;
   const dr=$("drop");["dragenter","dragover"].forEach(e=>dr.addEventListener(e,ev=>{ev.preventDefault();dr.classList.add("over")}));["dragleave","drop"].forEach(e=>dr.addEventListener(e,ev=>{ev.preventDefault();dr.classList.remove("over")}));dr.addEventListener("drop",ev=>importFiles(ev.dataTransfer.files));
 }
 async function importFiles(files){
@@ -525,10 +587,10 @@ async function importFiles(files){
       const rows=await readWorkbook(f),t=detect(rows);
       if(!t){res.push(`<tr><td>${esc(f.name)}</td><td colspan="2" class="neg">Not recognised</td></tr>`);continue}
       const agg=aggregate(t,rows);let added=0,upd=0;
-      changed.add(t);if(t==="stock"){D.stock=agg;added=agg.length}else for(const[k,v]of Object.entries(agg)){if(D[t][k])upd++;else added++;D[t][k]=v}
+      changed.add(t);if(t==="vp")Object.keys(D.vp).forEach(k=>{if(!k.includes("|"))delete D.vp[k]});if(t==="stock"){D.stock=agg;added=agg.length}else for(const[k,v]of Object.entries(agg)){if(D[t][k])upd++;else added++;D[t][k]=v}
       const ds=(t==="stock"||t==="acct")?[]:V(agg).map(x=>x.date).filter(Boolean).sort();
       D.meta[t]={at:today(),from:ds[0]?fd(ds[0]):"",to:ds.length?fd(ds[ds.length-1]):"",file:f.name};
-      res.push(`<tr><td>${esc(f.name)}</td><td>${esc(REPORTS[t].name)}</td><td class="num">${added} new${upd?`, ${upd} updated`:""}</td></tr>`);
+      res.push(`<tr><td>${esc(f.name)}</td><td>${esc(REPORTS[t].name)}</td><td class="num">${added} new${upd?`, <span class="muted">${upd} already in app – updated, not doubled</span>`:""}</td></tr>`);
     }catch(e){res.push(`<tr><td>${esc(f.name)}</td><td colspan="2" class="neg">Error: ${esc(e.message)}</td></tr>`)}
   }
   save();imp();$("log").innerHTML=`<div class="card">⏳ Saving to cloud…</div>`;
@@ -543,17 +605,38 @@ const FB_CONFIG={apiKey:"AIzaSyD2pxvbbNT5uudWBSCYPs_UJB-PecmKkaU",authDomain:"de
 const FBK=KEY+"_fbcfg";
 function fbCfg(){if(FB_CONFIG)return FB_CONFIG;try{return JSON.parse(localStorage.getItem(FBK))||null}catch(e){return null}}
 function parseCfg(t){const o={};String(t||"").replace(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g,(m,k,v)=>{o[k]=v});return o.apiKey&&o.projectId&&o.appId?{apiKey:o.apiKey,authDomain:o.authDomain||"",projectId:o.projectId,storageBucket:o.storageBucket||"",messagingSenderId:o.messagingSenderId||"",appId:o.appId}:null}
-function rulesText(v){const em=[...new Set(String(v||"").split(/[,\s;]+/).map(x=>x.trim().toLowerCase()).filter(x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)))];return `rules_version = '2';
+const emList=v=>[...new Set(String(v||"").split(/[,\s;]+/).map(x=>x.trim().toLowerCase()).filter(x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)))];
+const FIN_KEYS=["id","inv","cust","model","vin","co","amt","date","status","doneDate","note","by"];
+function rulesText(v,st){const em=emList(v),sf=emList(st),L=a=>a.map(e=>`'${e}'`).join(", ");return `rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Owners: everything
     match /shops/${SHOP}/{document=**} {
       allow read, write: if request.auth != null
-        && request.auth.token.email.lower() in [${em.map(e=>`'${e}'`).join(", ")}];
-    }
+        && request.auth.token.email.lower() in [${L(em)}];
+    }${sf.length?`
+    // Staff: can only add / see their own finance entries
+    match /shops/${SHOP}/fin/{id} {
+      allow read: if request.auth != null
+        && request.auth.token.email.lower() in [${L(sf)}]
+        && resource.data.by == request.auth.token.email;
+      allow create: if request.auth != null
+        && request.auth.token.email.lower() in [${L(sf)}]
+        && request.resource.data.by == request.auth.token.email
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly([${L(FIN_KEYS)}]);
+      allow update: if request.auth != null
+        && request.auth.token.email.lower() in [${L(sf)}]
+        && resource.data.by == request.auth.token.email
+        && resource.data.status == 'pending'
+        && request.resource.data.by == request.auth.token.email
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly([${L(FIN_KEYS)}]);
+    }`:""}
   }
 }`}
-function rulesBox(v){return `<details style="margin-top:12px"><summary>Firestore Rules – which emails can open this data</summary><p class="muted">Type login emails (comma separated), copy the text below into Firebase → Firestore → Rules → Publish.</p><input id="rulesEm" value="${esc(v)}" oninput="$('rulesOut').value=rulesText(this.value)"><textarea id="rulesOut" readonly style="min-height:170px;font:12px ui-monospace,Menlo,monospace;margin-top:6px">${esc(rulesText(v))}</textarea></details>`}
-function setup(){screen(`<h2 style="margin-top:0">Connect Deepanshu Enterprises database</h2><p class="muted">Firebase → Project settings → Your apps → Web app → copy the whole <b>firebaseConfig = { … }</b> block and paste it here.</p><textarea id="fbIn" rows="8" placeholder="const firebaseConfig = {\n  apiKey: &quot;…&quot;,\n  projectId: &quot;…&quot;, …\n};"></textarea><p><button class="btn" onclick="const c=parseCfg($('fbIn').value);if(!c)return alert('Config incomplete — copy the whole firebaseConfig block.');try{localStorage.setItem(FBK,JSON.stringify(c))}catch(e){}location.reload()">Connect</button></p>${rulesBox("aiashwanimaingi@gmail.com, deepanshumaingi@gmail.com")}`)}
+function rulesBox(v,st){return `<details style="margin-top:12px"><summary>Firestore Rules – who can open this data</summary><p class="muted">Owners see everything. Staff can only enter finance (invoice, company, amount) and see nothing else. Copy the text into Firebase → Firestore → Rules → Publish.</p><label>Owner emails</label><input id="rulesEm" value="${esc(v)}" oninput="$('rulesOut').value=rulesText(this.value,$('rulesSt').value)"><label style="margin-top:6px">Staff emails (finance entry only)</label><input id="rulesSt" value="${esc(st||"")}" oninput="$('rulesOut').value=rulesText($('rulesEm').value,this.value)"><textarea id="rulesOut" readonly style="min-height:220px;font:12px ui-monospace,Menlo,monospace;margin-top:6px">${esc(rulesText(v,st))}</textarea></details>`}
+function setup(){screen(`<h2 style="margin-top:0">Connect Deepanshu Enterprises database</h2><p class="muted">Firebase → Project settings → Your apps → Web app → copy the whole <b>firebaseConfig = { … }</b> block and paste it here.</p><textarea id="fbIn" rows="8" placeholder="const firebaseConfig = {\n  apiKey: &quot;…&quot;,\n  projectId: &quot;…&quot;, …\n};"></textarea><p><button class="btn" onclick="const c=parseCfg($('fbIn').value);if(!c)return alert('Config incomplete — copy the whole firebaseConfig block.');try{localStorage.setItem(FBK,JSON.stringify(c))}catch(e){}location.reload()">Connect</button></p>${rulesBox("aiashwanimaingi@gmail.com, deepanshumaingi@gmail.com","")}`)}
 const SHOP="deepanshu-enterprises",FBV="12.19.0",DMSK=["vs","vp","sv","pp","ps","rc","stock","acct","snap","wc"],CH=700000;
 let FB=null,ME="",VER=null,PARTS={},UNSUB=[];
 const sid=k=>String(k).replace(/[\/\s]/g,"_");
@@ -583,9 +666,13 @@ async function doLogin(e){e.preventDefault();$("l_b").disabled=true;$("l_b").tex
 async function forgot(){const em=$("l_e").value.trim();if(!em)return alert("First type your email above.");try{await FB.U.sendPasswordResetEmail(FB.auth,em);alert("Password reset link sent to "+em+" (check Spam too).")}catch(er){alert(authMsg(er))}}
 async function logout(){UNSUB.forEach(u=>{try{u()}catch(e){}});UNSUB=[];try{localStorage.removeItem(KEY)}catch(e){}try{await FB.U.signOut(FB.auth)}catch(e){}location.reload()}
 const R_=(...p)=>FB.F.doc(FB.db,"shops",SHOP,...p),C_=c=>FB.F.collection(FB.db,"shops",SHOP,c);
-function start(){
+async function start(){
+  screen(`<div class="empty">⏳ Loading…</div>`);setSync("⏳");
+  try{await FB.F.getDoc(R_("meta","info"))}catch(e){if(/permission-denied/.test(e&&e.code||""))return staffStart();}
+  startOwner()}
+function startOwner(){
   screen(`<div class="empty">⏳ Loading data…</div>`);setSync("⏳");
-  const {F}=FB;let ready={m:0,e:0,c:0,f:0,p:0,a:0};const go1=()=>{if(ready.m&&ready.e&&ready.c&&ready.f&&ready.p&&ready.a){setSync("☁ Synced · "+ME);save();nav();render()}};
+  const {F}=FB;let ready={m:0,e:0,c:0,f:0,p:0,a:0,k:0};const go1=()=>{if(ready.m&&ready.e&&ready.c&&ready.f&&ready.p&&ready.a&&ready.k){setSync("☁ Synced · "+ME);save();nav();render()}};
   UNSUB.push(F.onSnapshot(R_("meta","info"),async snap=>{
     const m=snap.exists()?snap.data():null;
     if(!m){if(!ready.m){ready.m=1;go1();if(!noData()){setSync("⏳ Uploading this device's data…");try{await pushDMS(DMSK);D.exp.forEach(e=>cPut("exp",e.id,e));Object.entries(D.coll).forEach(([no,v])=>cPut("coll",no,{...v,no}));setSync("☁ Synced · "+ME)}catch(e){cErr(e)}}}return}
@@ -594,6 +681,7 @@ function start(){
     VER=m.ver;PARTS=m.parts||{};D.meta=m.meta||{};
     if(!ready.m){ready.m=1;go1()}else{save();refresh()}
   },cErr));
+  UNSUB.push(F.onSnapshot(C_("dupok"),snap=>{const o={};snap.docs.forEach(d=>{o[d.data().key]=1});D.dupok=o;if(!ready.k){ready.k=1;go1()}else refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("areg"),snap=>{D.areg=snap.docs.map(d=>d.data());if(!ready.a){ready.a=1;go1()}else refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("fin"),snap=>{D.fin=snap.docs.map(d=>d.data());if(!ready.f){ready.f=1;go1()}else refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("finpay"),snap=>{D.finpay=snap.docs.map(d=>d.data());if(!ready.p){ready.p=1;go1()}else refresh()},cErr));
@@ -615,9 +703,9 @@ async function pushDMS(keys){
   VER=ver;PARTS=parts;
 }
 async function curMeta(){try{const s=await FB.F.getDoc(R_("meta","info"));return s.exists()?s.data():{}}catch(e){return{}}}
-function cPut(c,id,obj){if(!FB)return;setSync("⏳ Saving…");FB.F.setDoc(R_(c,sid(id)),{...obj,by:ME}).then(()=>setSync("☁ Synced · "+ME),cErr)}
+function cPut(c,id,obj){if(!FB)return;setSync("⏳ Saving…");FB.F.setDoc(R_(c,sid(id)),{...obj,by:obj.by||ME}).then(()=>setSync("☁ Synced · "+ME),cErr)}
 function cDel(c,id){if(!FB)return;setSync("⏳ Saving…");FB.F.deleteDoc(R_(c,sid(id))).then(()=>setSync("☁ Synced · "+ME),cErr)}
-function cErr(e){const c=(e&&e.code)||"";if(/permission-denied/.test(c)){UNSUB.forEach(u=>{try{u()}catch(x){}});UNSUB=[];screen(`<h2 style="margin-top:0">Access not given</h2><p><b>${esc(ME)}</b> cannot open this data yet. Add this email in Firebase → Firestore → Rules.</p>${rulesBox(ME)}<button class="btn" onclick="logout()">Logout</button>`);return}setSync("⚠ "+(c||e.message||e))}
+function cErr(e){const c=(e&&e.code)||"";if(/permission-denied/.test(c)){UNSUB.forEach(u=>{try{u()}catch(x){}});UNSUB=[];screen(`<h2 style="margin-top:0">Access not given</h2><p><b>${esc(ME)}</b> cannot open this data yet. Add this email in Firebase → Firestore → Rules.</p>${rulesBox(ME,"")}<button class="btn" onclick="logout()">Logout</button>`);return}setSync("⚠ "+(c||e.message||e))}
 let _rT=0;function refresh(){clearTimeout(_rT);_rT=setTimeout(refresh_,200)}
 function refresh_(){if(dlg.open)return;const a=document.activeElement;if(a&&/INPUT|SELECT|TEXTAREA/.test(a.tagName)&&$("app").contains(a))return;nav();render()}
 function saveColl(no){const v={no,date:$("m_d").value,amt:N($("m_a").value),mode:$("m_m").value};D.coll[no]=v;save();cPut("coll",no,v);dlg.close();nav();render()}
