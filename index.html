@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deepanshu Enterprises – Hero Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--red:#d71920;--red-d:#a51117;--ink:#1d1d1f;--mute:#6b6b70;--line:#e4e4e8;--bg:#f6f6f8;--card:#fff;--green:#1f8a4c;--amber:#b7791f;--blue:#2457c5}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:15px}
+header{background:var(--red);color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5}
+header h1{font-size:19px;margin:0}header small{opacity:.85}
+nav{display:flex;gap:2px;overflow-x:auto;background:#fff;border-bottom:1px solid var(--line);padding:0 8px;position:sticky;top:52px;z-index:4}
+nav button{flex:none;border:0;background:none;padding:12px;font-size:14px;color:var(--mute);cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent}
+nav button.on{color:var(--red);border-bottom-color:var(--red);font-weight:600}
+main{max-width:1200px;margin:0 auto;padding:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.stat .n{font-size:22px;font-weight:700;margin-top:4px;white-space:nowrap}
+.stat .l{color:var(--mute);font-size:13px}.stat .s{color:var(--mute);font-size:12px;margin-top:2px}
+.click{cursor:pointer}.click:hover{border-color:var(--red)}
+h2{font-size:17px;margin:20px 0 10px}h3{font-size:15px;margin:0 0 10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+input,select,textarea{font:inherit;font-size:16px;padding:8px 10px;border:1px solid #cfcfd6;border-radius:8px;background:#fff;width:100%}
+.row input,.row select{width:auto;max-width:260px}
+label{font-size:12px;color:var(--mute);display:block;margin-bottom:3px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.btn{border:0;background:var(--red);color:#fff;padding:9px 14px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
+.btn:hover{background:var(--red-d)}.btn.g{background:#fff;color:var(--ink);border:1px solid #cfcfd6}.btn.s{padding:5px 9px;font-size:13px}
+.seg{display:inline-flex;border:1px solid #cfcfd6;border-radius:8px;overflow:hidden}.seg button{border:0;background:#fff;padding:8px 12px;font:inherit;cursor:pointer}.seg button.on{background:var(--ink);color:#fff}
+table{width:100%;border-collapse:collapse;background:#fff;font-size:14px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:#fafafb;font-size:12px;color:var(--mute);font-weight:600;position:sticky;top:0}
+.tw{overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:70vh}
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+.p-ok{background:#e5f5ec;color:var(--green)}.p-w{background:#fdf3e2;color:var(--amber)}.p-r{background:#fde8e8;color:var(--red)}.p-n{background:#eee;color:#555}.p-b{background:#e6eefc;color:var(--blue)}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.muted{color:var(--mute);font-size:13px}.empty{padding:22px;text-align:center;color:var(--mute)}
+.pos{color:var(--green)}.neg{color:var(--red)}
+.bar{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}
+.bar .t{width:38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .b{flex:1;background:#f0f0f3;border-radius:4px;height:14px;overflow:hidden}.bar .b i{display:block;height:100%;background:var(--red)}
+.bar .v{width:105px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cols{display:flex;gap:4px;align-items:flex-end;height:150px;margin-top:8px}
+.cols>div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.cols i{display:block;width:70%;max-width:34px;background:var(--red);border-radius:3px 3px 0 0;min-height:1px}
+.cols b{font-size:11px;font-weight:600;margin-bottom:2px}.cols span{font-size:11px;color:var(--mute);margin-top:4px}
+dialog{border:0;border-radius:14px;padding:0;max-width:760px;width:96%}
+dialog .hd{background:var(--red);color:#fff;padding:12px 16px;font-weight:600;display:flex;justify-content:space-between}
+dialog .bd{padding:16px;max-height:80vh;overflow:auto}
+.drop{border:2px dashed #cfcfd6;border-radius:12px;padding:26px;text-align:center;background:#fff;cursor:pointer}
+.drop.over{border-color:var(--red);background:#fff5f5}
+.note{background:#fff8e6;border:1px solid #f1d9a0;border-radius:10px;padding:10px 12px;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data</small></div>
+  <div style="text-align:right"><span id="sync" style="font-size:12px;opacity:.9;margin-right:6px"></span><button class="btn g s hide-off" onclick="backup()">⬇ Backup</button> <button class="btn g s" onclick="$('restoreFile').click()">⬆ Restore</button><input type="file" id="restoreFile" accept=".json" hidden onchange="restore(this)"> <button class="btn g s" id="logoutBtn" style="display:none" onclick="logout()">Logout</button></div>
+</header>
+<nav id="nav"></nav>
+<main id="app"></main>
+<dialog id="dlg"><div class="hd"><span id="dlgT"></span><span style="cursor:pointer" onclick="dlg.close()">✕</span></div><div class="bd" id="dlgB"></div></dialog>
+
+<script>
+/* ================= data ================= */
+const KEY="deepanshuHeroDMS_v2";
+const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},meta:{}});
+let D=EMPTY();
+try{const s=localStorage.getItem(KEY);if(s)D=Object.assign(EMPTY(),JSON.parse(s))}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){alert("Browser storage is full or blocked. Take a Backup file.")}}
+const $=id=>document.getElementById(id);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const iso=d=>{const z=new Date(d.getTime()-d.getTimezoneOffset()*6e4);return z.toISOString().slice(0,10)};
+const today=()=>iso(new Date());
+const N=v=>{if(typeof v==="number")return v;const x=parseFloat(String(v??"").replace(/[₹,\s]/g,""));return isNaN(x)?0:x};
+const rs=n=>(n<0?"-":"")+"₹"+Math.round(Math.abs(Number(n)||0)).toLocaleString("en-IN");
+const lakh=n=>Math.abs(n)>=1e5?(n<0?"-":"")+"₹"+(Math.abs(n)/1e5).toFixed(2)+" L":rs(n);
+const fd=d=>d?new Date(d+"T00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"2-digit"}):"";
+const diff=d=>Math.round((new Date(today()+"T00:00")-new Date(d+"T00:00"))/864e5);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const sum=(a,f)=>a.reduce((t,x)=>t+(f(x)||0),0);
+const V=o=>Object.values(o);
+const MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+function pDate(v){
+  if(v instanceof Date&&!isNaN(v))return iso(new Date(v.getTime()+432e5));
+  if(typeof v==="number"&&v>20000&&v<80000)return new Date(Math.round((v-25569)*864e5)).toISOString().slice(0,10);
+  const s=String(v||"").trim();let m;
+  if(m=s.match(/^(\d{1,2})[\s\-]([A-Za-z]{3})[a-z]*[\s\-,]*(\d{2,4})/)){const mo=MON[m[2].toLowerCase()];if(mo!=null){const y=m[3].length===2?"20"+m[3]:m[3];return`${y}-${String(mo+1).padStart(2,"0")}-${m[1].padStart(2,"0")}`}}
+  if(m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))return`${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}`;
+  if(m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/)){const y=m[3].length===2?"20"+m[3]:m[3];return`${y}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`}
+  return "";
+}
+// "RAGHAV MACHAL66115-01-SCON-0426-1" -> "RAGHAV MACHAL"
+function cname(n,code){n=String(n||"").trim();code=String(code||"").trim();if(code&&n.endsWith(code))n=n.slice(0,-code.length);n=n.replace(/\d{5}-\d{2}-[A-Z]+-[\d-]+$/,"").replace(/\d-\d{6,}$/,"");return n.replace(/[\s.]+$/,"").trim()||"Cash Sales"}
+
+/* ================= DMS report detection + aggregation ================= */
+const REPORTS={
+  vs:{name:"Vehicle Sales Transactions",test:h=>h.has("Vin No.")&&h.has("Bill Amount")},
+  vp:{name:"Tally – Vehicle Purchase",test:h=>h.has("Vin No")&&h.has("Stock In Date")},
+  sv:{name:"Tally – Service Transaction",test:h=>h.has("Job Card Type")},
+  pp:{name:"Tally – Part Purchase",test:h=>h.has("GRN No")||h.has("Part Purchase Order#")},
+  ps:{name:"Part Sales Transactions",test:h=>h.has("Total Invoice Amount")&&h.has("Part NO")},
+  stock:{name:"Parts Stock Report",test:h=>h.has("Opening Qty")&&h.has("Part No")},
+  rc:{name:"Tally – Payment (receipts)",test:h=>h.has("Transaction Type")&&h.has("Voucher Number")&&h.has("Amount")},
+  acct:{name:"Tally – Account Master",test:h=>h.has("Group / Category")}
+};
+function detect(rows){const h=new Set(Object.keys(rows[0]||{}));return Object.keys(REPORTS).find(k=>REPORTS[k].test(h))}
+function aggregate(type,rows){
+  const out={};const g=(r,k)=>r[k]??"";
+  if(type==="vs")rows.forEach(r=>{const no=g(r,"Invoice No"),vin=String(g(r,"Vin No.")).trim();if(!no||!vin)return;const k=no+"|"+vin;const o=out[k]||(out[k]={no,vin,date:pDate(g(r,"Invoice Date")),cust:cname(g(r,"Customer Name"),g(r,"Customer Code")),code:String(g(r,"Customer Code")).trim(),model:String(g(r,"Model")).trim(),variant:g(r,"Variant"),cat:g(r,"Product Category"),value:N(g(r,"Value")),bill:N(g(r,"Bill Amount")),disc:N(g(r,"Line Item Discount"))+N(g(r,"Header Discount")),open:true});if(String(g(r,"Invoice Status")).trim()==="Cancelled")o.open=false});
+  if(type==="vp")rows.forEach(r=>{const vin=g(r,"Vin No");if(!vin)return;out[vin]={vin,date:pDate(g(r,"Stock In Date"))||pDate(g(r,"Invoice Date")),inv:g(r,"Invoice Number"),model:String(g(r,"Model")).trim(),desc:g(r,"SKU Description"),sup:cname(g(r,"Supplier Name"),g(r,"Supplier Code")),taxable:N(g(r,"Assessable Value")),cost:N(g(r,"Assessable Value"))+N(g(r,"CGST Amt"))+N(g(r,"SGST/UTGST Amt"))+N(g(r,"IGST Amt"))+N(g(r,"TCS Amt"))+N(g(r,"Cess Amt"))}});
+  if(type==="sv")rows.forEach(r=>{const no=g(r,"Invoice Number");if(!no)return;const o=out[no]||(out[no]={no,date:pDate(g(r,"Invoice Date")),jc:g(r,"Narration"),jt:String(g(r,"Job Card Type")).trim(),it:String(g(r,"Invoice Type")).trim(),cust:cname(g(r,"Customer Name"),g(r,"Customer Code")),labour:0,parts:0,lines:0,total:N(g(r,"Round Off Amount")),open:true,model:""});if(String(g(r,"Invoice Status")).trim()==="Cancelled"){o.open=false;return}
+    const amt=N(g(r,"Retail Amount"));if(String(g(r,"JOB/PART")).trim()==="Job"){o.labour+=amt;const m=String(g(r,"SKU Name")).split("-").pop().trim();if(!o.model&&m&&m.length<25)o.model=m}else o.parts+=amt;o.lines+=amt});
+  if(type==="sv")V(out).forEach(o=>{if(!o.total||Math.abs(o.total-o.lines)>Math.max(5,o.lines*.05))o.total=Math.round(o.lines);delete o.lines});
+  if(type==="pp")rows.forEach(r=>{const no=g(r,"Invoice Number");if(!no)return;const o=out[no]||(out[no]={no,date:pDate(g(r,"GRN Date"))||pDate(g(r,"Invoice Date")),sup:cname(g(r,"Supplier Name"),g(r,"Supplier Code")),total:N(g(r,"Invoice Value")),lines:0,cats:{}});const c=g(r,"Product Category")||"Other";o.cats[c]=(o.cats[c]||0)+N(g(r,"Net Taxable Value"));o.lines++});
+  if(type==="ps")rows.forEach(r=>{const no=g(r,"Invoice Number");if(!no)return;const o=out[no]||(out[no]={no,date:pDate(g(r,"Invoice Date")),cust:cname(g(r,"Customer Name"),g(r,"Customer Code")),total:N(g(r,"Total Invoice Amount")),it:g(r,"Invoice Type"),open:true,cats:{}});if(String(g(r,"Invoice Status")).trim()==="Cancelled")o.open=false;const c=g(r,"Product Category")||"Other";o.cats[c]=(o.cats[c]||0)+N(g(r,"Assessable Value"))});
+  if(type==="rc")rows.forEach(r=>{const no=g(r,"Voucher Number");if(!no)return;out[no]={no,date:pDate(g(r,"Voucher Date")),tt:String(g(r,"Transaction Type")).trim(),mode:g(r,"Mode of Payment"),code:String(g(r,"Customer Code")).trim(),party:cname(g(r,"Ledger Code"),g(r,"Customer Code")),amt:N(g(r,"Amount")),bank:g(r,"Bank Name")}});
+  if(type==="acct")rows.forEach(r=>{const code=String(g(r,"Customer Code")).trim();if(!code)return;out[code]={code,name:cname(g(r,"Customer Name"),code),type:g(r,"Type"),group:g(r,"Group / Category"),mobile:String(g(r,"Mobile No.")).trim(),city:g(r,"Village/Town/City")}});
+  if(type==="stock")return rows.filter(r=>g(r,"Part No")).map(r=>({part:g(r,"Part No"),name:String(g(r,"Part Name")).replace(/-[A-Z0-9]+$/,""),cat:g(r,"Product Category"),qty:N(g(r,"Opening Qty")),val:N(g(r,"Opening Value"))}));
+  return out;
+}
+async function readWorkbook(file){
+  const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:"array"});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws,{defval:"",raw:true}).map(r=>{const o={};for(const k in r)o[k.trim()]=r[k];return o}).filter(r=>Object.values(r).some(v=>String(v).trim()!==""));
+}
+
+/* ================= derived ================= */
+let per="fy";
+function range(){const t=new Date(),y=t.getFullYear(),m=t.getMonth();
+  if(per==="m")return[iso(new Date(y,m,1)),today()];if(per==="lm")return[iso(new Date(y,m-1,1)),iso(new Date(y,m,0))];
+  if(per==="fy"){const fy=m>=3?y:y-1;return[`${fy}-04-01`,`${fy+1}-03-31`]}if(per==="t")return[today(),today()];return["0000","9999"]}
+const inR=(d,r)=>d&&d>=r[0]&&d<=r[1];
+const perSel=()=>`<select onchange="per=this.value;render()">${[["t","Today"],["m","This month"],["lm","Last month"],["fy","This financial year"],["all","All data"]].map(([v,l])=>`<option value="${v}" ${v===per?"selected":""}>${l}</option>`).join("")}</select>`;
+const soldVins=()=>new Set(V(D.vs).filter(s=>s.open).map(s=>s.vin));
+function sales(r){return V(D.vs).filter(s=>s.open&&(!r||inR(s.date,r)))}
+function services(r){return V(D.sv).filter(s=>s.open&&(!r||inR(s.date,r)))}
+function margin(s){const p=D.vp[s.vin];return p?s.value-p.taxable:null}
+function firstSale(){const d=V(D.vs).map(s=>s.date).filter(Boolean).sort();return d[0]||""}
+function stockVehicles(){const sold=soldVins(),fs=firstSale();return V(D.vp).filter(p=>!sold.has(p.vin)).map(p=>({...p,age:diff(p.date),old:fs&&p.date<fs}))}
+function creditBills(){return services().filter(s=>s.it==="Credit").map(s=>({...s,got:D.coll[s.no]})).sort((a,b)=>a.date.localeCompare(b.date))}
+const pending=()=>creditBills().filter(b=>!b.got);
+const months=n=>{const a=[],t=new Date();for(let i=n-1;i>=0;i--)a.push(iso(new Date(t.getFullYear(),t.getMonth()-i,1)).slice(0,7));return a};
+const ml=m=>new Date(m+"-01T00:00").toLocaleDateString("en-IN",{month:"short"});
+function bars(items,fmt=lakh,color){const mx=Math.max(1,...items.map(x=>x[1]));return items.map(([k,v])=>`<div class="bar"><span class="t" title="${esc(k)}">${esc(k)}</span><span class="b"><i style="width:${v/mx*100}%;${color?"background:"+color:""}"></i></span><span class="v">${fmt(v)}</span></div>`).join("")}
+function cols(items,fmt){const mx=Math.max(1,...items.map(x=>x[1]));return `<div class="cols">${items.map(([k,v])=>`<div><b>${fmt(v)}</b><i style="height:${v/mx*110}px"></i><span>${k}</span></div>`).join("")}</div>`}
+function groupSum(a,kf,vf){const o={};a.forEach(x=>{const k=kf(x)||"Other";o[k]=(o[k]||0)+vf(x)});return Object.entries(o).sort((a,b)=>b[1]-a[1])}
+
+/* ================= views ================= */
+const TABS={dash:"Dashboard",veh:"Vehicles",svc:"Service",acc:"Accidental / Insurance",col:"To collect",parts:"Parts",money:"Money & Expenses",imp:"Import DMS files"};
+let tab="dash";
+function nav(){$("nav").innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="${k===tab?"on":""}" onclick="go('${k}')">${v}${k==="col"&&pending().length?` <span class="pill p-r">${pending().length}</span>`:""}</button>`).join("")}
+function go(t){tab=t;nav();render();scrollTo(0,0)}
+function render(){({dash,veh,svc,acc,col,parts,money,imp})[tab]()}
+const noData=()=>!Object.keys(D.vs).length&&!Object.keys(D.sv).length&&!Object.keys(D.vp).length;
+
+function dash(){
+  if(noData()){$("app").innerHTML=`<div class="card" style="text-align:center;padding:40px"><h2 style="margin-top:0">DMS की Excel files डालें</h2><p class="muted">Vehicle Sales, Vehicle Purchase, Service, Part Purchase, Part Sales, Parts Stock, Payment — सब एक साथ चुन सकते हैं।</p><button class="btn" onclick="go('imp')">Import DMS files</button></div>`;return}
+  const r=range(),S=sales(r),J=services(r),P=V(D.ps).filter(x=>x.open&&inR(x.date,r));
+  const VP=V(D.vp).filter(p=>inR(p.date,r)),PP=V(D.pp).filter(p=>inR(p.date,r));
+  const RC=V(D.rc).filter(x=>inR(x.date,r)),EX=D.exp.filter(x=>inR(x.date,r));
+  const vsale=sum(S,s=>s.bill),svc=sum(J,j=>j.total),cnt=sum(P,p=>p.total);
+  const withM=S.filter(s=>margin(s)!==null),mg=sum(withM,margin);
+  const cashIn=sum(RC.filter(x=>!/payment/i.test(x.tt)),x=>x.amt)+sum(EX.filter(x=>x.type==="in"),x=>x.amt)+sum(V(D.coll).filter(c=>inR(c.date,r)),c=>c.amt);
+  const out=sum(EX.filter(x=>x.type==="out"),x=>x.amt)+sum(RC.filter(x=>/payment/i.test(x.tt)),x=>x.amt);
+  const pend=pending(),pendT=sum(pend,b=>b.total);
+  const st=stockVehicles().filter(x=>!x.old),stV=sum(st,x=>x.cost),aged=st.filter(x=>x.age>60);
+  const pst=sum(D.stock,x=>x.val);
+  const ms=months(6);
+  const mVeh=ms.map(m=>[ml(m),sales().filter(s=>s.date.slice(0,7)===m).length]);
+  const mSvc=ms.map(m=>[ml(m),sum(services().filter(s=>s.date.slice(0,7)===m),s=>s.total)]);
+  const svcType=groupSum(J,j=>j.jt,j=>j.total);
+  const modM=groupSum(withM,s=>s.model,s=>margin(s)).slice(0,6);
+  const expH=groupSum(EX.filter(x=>x.type==="out"),x=>x.head,x=>x.amt).slice(0,6);
+  $("app").innerHTML=`
+  <div class="row" style="justify-content:space-between"><h2 style="margin:4px 0">Business at a glance</h2>${perSel()}</div>
+  <div class="grid">
+    <div class="card stat click" onclick="go('veh')"><div class="l">Vehicle sales</div><div class="n">${lakh(vsale)}</div><div class="s">${S.length} vehicles</div></div>
+    <div class="card stat click" onclick="go('svc')"><div class="l">Service billing</div><div class="n">${lakh(svc)}</div><div class="s">${J.length} job cards</div></div>
+    <div class="card stat click" onclick="go('parts')"><div class="l">Counter parts sale</div><div class="n">${lakh(cnt)}</div><div class="s">${P.length} bills</div></div>
+    <div class="card stat"><div class="l">Total business</div><div class="n">${lakh(vsale+svc+cnt)}</div><div class="s">incl. GST</div></div>
+  </div>
+  <div class="grid" style="margin-top:10px">
+    <div class="card stat click" onclick="go('veh')"><div class="l">Vehicle margin (ex-GST)</div><div class="n ${mg>=0?"pos":"neg"}">${lakh(mg)}</div><div class="s">avg ${rs(withM.length?mg/withM.length:0)} / vehicle</div></div>
+    <div class="card stat"><div class="l">Purchases</div><div class="n">${lakh(sum(VP,p=>p.cost)+sum(PP,p=>p.total))}</div><div class="s">vehicles ${lakh(sum(VP,p=>p.cost))} · parts ${lakh(sum(PP,p=>p.total))}</div></div>
+    <div class="card stat click" onclick="go('money')"><div class="l">Money received</div><div class="n pos">${lakh(cashIn)}</div><div class="s">DMS receipts + entries</div></div>
+    <div class="card stat click" onclick="go('money')"><div class="l">Expenses entered</div><div class="n neg">${lakh(out)}</div><div class="s">${EX.filter(x=>x.type==="out").length?"salary, rent etc.":"none entered yet"}</div></div>
+  </div>
+  <div class="grid" style="margin-top:10px">
+    <div class="card stat click" onclick="go('col')" style="${pend.length?"border-color:var(--red)":""}"><div class="l">To collect (credit bills)</div><div class="n neg">${lakh(pendT)}</div><div class="s">${pend.length} bills · insurance & credit</div></div>
+    <div class="card stat click" onclick="go('veh');vehView='stock'"><div class="l">Vehicles in stock</div><div class="n">${st.length}</div><div class="s">${lakh(stV)} · ${aged.length} older than 60 days</div></div>
+    <div class="card stat click" onclick="go('parts')"><div class="l">Parts stock</div><div class="n">${lakh(pst)}</div><div class="s">${D.stock.length} part nos.</div></div>
+    <div class="card stat click" onclick="go('acc')"><div class="l">Accidental jobs</div><div class="n">${J.filter(j=>j.jt==="Accidental").length}</div><div class="s">${lakh(sum(J.filter(j=>j.jt==="Accidental"),j=>j.total))}</div></div>
+  </div>
+  <div class="g2" style="margin-top:12px">
+    <div class="card"><h3>Vehicles sold per month</h3>${cols(mVeh,v=>v)}</div>
+    <div class="card"><h3>Service billing per month</h3>${cols(mSvc,v=>v>=1e5?(v/1e5).toFixed(1)+"L":Math.round(v/1e3)+"k")}</div>
+    <div class="card"><h3>Service billing by job type</h3>${svcType.length?bars(svcType):`<div class="muted">No service in this period.</div>`}</div>
+    <div class="card"><h3>Vehicle margin by model (ex-GST)</h3>${modM.length?bars(modM,lakh,"var(--green)"):`<div class="muted">Import Vehicle Purchase to see margin.</div>`}</div>
+    <div class="card"><h3>Where money went</h3>${expH.length?bars(expH):`<div class="muted">DMS files have no expenses. Add salary, rent, distributor payments in <a href="#" onclick="go('money');return false">Money & Expenses</a>.</div>`}</div>
+    <div class="card"><h3>Biggest amounts to collect</h3>${pend.length?bars(groupSum(pend,b=>b.cust,b=>b.total).slice(0,6)):`<div class="muted">Nothing pending.</div>`}</div>
+  </div>
+  <p class="muted">Data: ${Object.entries(D.meta).map(([k,m])=>`${REPORTS[k]?.name.replace("Tally – ","")} (${fd(m.at)})`).join(" · ")}</p>`;
+}
+
+/* ---------- vehicles ---------- */
+let vehView="sales",vq="";
+function veh(){
+  const r=range();
+  const head=`<div class="row"><span class="seg"><button class="${vehView==="sales"?"on":""}" onclick="vehView='sales';veh()">Sales</button><button class="${vehView==="stock"?"on":""}" onclick="vehView='stock';veh()">Stock</button></span>${vehView==="sales"?perSel():""}<input placeholder="Search name / model / VIN" value="${esc(vq)}" oninput="vq=this.value;veh();refocus(this)"></div>`;
+  if(vehView==="sales"){
+    const S=sales(r).filter(s=>(s.cust+s.model+s.vin+s.no).toLowerCase().includes(vq.toLowerCase())).sort((a,b)=>b.date.localeCompare(a.date)||b.no.localeCompare(a.no));
+    const wm=S.filter(s=>margin(s)!==null),mg=sum(wm,margin),low=wm.filter(s=>margin(s)<1000);
+    const byM=groupSum(S,s=>s.model,()=>1);
+    $("app").innerHTML=head+`<div class="grid"><div class="card stat"><div class="l">Vehicles sold</div><div class="n">${S.length}</div></div><div class="card stat"><div class="l">Sale value</div><div class="n">${lakh(sum(S,s=>s.bill))}</div></div><div class="card stat"><div class="l">Margin (ex-GST)</div><div class="n pos">${lakh(mg)}</div><div class="s">avg ${rs(wm.length?mg/wm.length:0)}</div></div><div class="card stat"><div class="l">Discount given</div><div class="n neg">${lakh(sum(S,s=>s.disc))}</div></div><div class="card stat"><div class="l">Sold below ₹1,000 margin</div><div class="n ${low.length?"neg":""}">${low.length}</div></div></div>
+    <div class="g2" style="margin:12px 0"><div class="card"><h3>Models sold</h3>${bars(byM.slice(0,8),v=>v+" pcs")}</div><div class="card"><h3>Margin per vehicle by model</h3>${bars(groupSum(wm,s=>s.model,margin).map(([k,v])=>[k,v/wm.filter(s=>s.model===k).length]).sort((a,b)=>b[1]-a[1]).slice(0,8),rs,"var(--green)")}</div></div>
+    ${table(["Date","Invoice","Customer","Model","VIN","Sale (with GST)","Discount","Purchase cost","Margin ex-GST"],S.slice(0,400).map(s=>{const p=D.vp[s.vin],m=margin(s);return[fd(s.date),esc(s.no),esc(s.cust),esc(s.model),`<span class="muted">${esc(s.vin)}</span>`,{n:rs(s.bill)},{n:s.disc?rs(s.disc):""},{n:p?rs(p.cost):"–"},{n:m===null?"–":`<span class="${m<1000?"neg":"pos"}">${rs(m)}</span>`}]}),S.length)}`;
+  }else{
+    const all=stockVehicles().filter(p=>(p.model+p.vin+p.desc).toLowerCase().includes(vq.toLowerCase())).sort((a,b)=>b.age-a.age);
+    const st=all.filter(x=>!x.old),old=all.filter(x=>x.old);
+    $("app").innerHTML=head+`<div class="grid"><div class="card stat"><div class="l">In stock</div><div class="n">${st.length}</div></div><div class="card stat"><div class="l">Stock value</div><div class="n">${lakh(sum(st,x=>x.cost))}</div></div><div class="card stat"><div class="l">Older than 60 days</div><div class="n neg">${st.filter(x=>x.age>60).length}</div><div class="s">${lakh(sum(st.filter(x=>x.age>60),x=>x.cost))} money stuck</div></div></div>
+    <div class="card" style="margin:12px 0"><h3>Stock by model</h3>${bars(groupSum(st,x=>x.model,()=>1),v=>v+" pcs")}</div>
+    ${table(["Stock in","Days","Model","Colour / SKU","VIN","Cost"],st.map(x=>[fd(x.date),`<span class="pill ${x.age>90?"p-r":x.age>60?"p-w":"p-ok"}">${x.age}</span>`,esc(x.model),`<span class="muted">${esc(x.desc)}</span>`,esc(x.vin),{n:rs(x.cost)}]),st.length)}
+    ${old.length?`<div class="note" style="margin-top:12px"><b>${old.length} vehicles</b> were bought before ${fd(firstSale())} (when the sales file starts), so the app cannot tell if they are sold. They are left out of stock. Import the older Vehicle Sales file to clear them.</div>`:""}`;
+  }
+}
+function table(h,rows,total){return rows.length?`<div class="tw"><table><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr>${rows.map(r=>`<tr>${r.map(c=>typeof c==="object"&&c!==null?`<td class="num">${c.n}</td>`:`<td>${c}</td>`).join("")}</tr>`).join("")}</table></div>${total>rows.length?`<p class="muted">Showing ${rows.length} of ${total}. Use search to narrow.</p>`:""}`:`<div class="card empty">Nothing to show.</div>`}
+function refocus(el){const p=el.placeholder;setTimeout(()=>{const n=[...document.querySelectorAll("input")].find(i=>i.placeholder===p);if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},0)}
+
+/* ---------- service ---------- */
+let sq="",sjt="";
+function svc(){
+  const r=range(),all=services(r),J=all.filter(s=>(!sjt||s.jt===sjt)&&(s.cust+s.no+s.jc+s.model).toLowerCase().includes(sq.toLowerCase())).sort((a,b)=>b.date.localeCompare(a.date));
+  const types=groupSum(all,s=>s.jt,s=>s.total);
+  $("app").innerHTML=`<div class="row">${perSel()}<select onchange="sjt=this.value;svc()"><option value="">All job types</option>${types.map(([k])=>`<option ${k===sjt?"selected":""}>${esc(k)}</option>`).join("")}</select><input placeholder="Search invoice / job card / party" value="${esc(sq)}" oninput="sq=this.value;svc();refocus(this)"></div>
+  <div class="grid"><div class="card stat"><div class="l">Job cards</div><div class="n">${J.length}</div></div><div class="card stat"><div class="l">Billing</div><div class="n">${lakh(sum(J,j=>j.total))}</div></div><div class="card stat"><div class="l">Labour</div><div class="n">${lakh(sum(J,j=>j.labour))}</div></div><div class="card stat"><div class="l">Parts used</div><div class="n">${lakh(sum(J,j=>j.parts))}</div></div><div class="card stat"><div class="l">Avg bill</div><div class="n">${rs(J.length?sum(J,j=>j.total)/J.length:0)}</div></div></div>
+  <div class="g2" style="margin:12px 0"><div class="card"><h3>Billing by job type</h3>${bars(types)}</div><div class="card"><h3>Job cards by type</h3>${bars(groupSum(all,s=>s.jt,()=>1),v=>v+" jobs")}</div></div>
+  ${table(["Date","Invoice","Job card","Type","Party","Cash / credit","Labour","Parts","Total"],J.slice(0,400).map(j=>[fd(j.date),esc(j.no),`<span class="muted">${esc(j.jc)}</span>`,esc(j.jt),esc(j.cust),j.it==="Credit"?`<span class="pill p-w">Credit</span>`:"Cash",{n:rs(j.labour)},{n:rs(j.parts)},{n:`<b>${rs(j.total)}</b>`}]),J.length)}`;
+}
+
+/* ---------- accidental ---------- */
+function acc(){
+  const r=range(),A=services(r).filter(s=>s.jt==="Accidental").sort((a,b)=>b.date.localeCompare(a.date));
+  const cr=A.filter(a=>a.it==="Credit"),cash=A.filter(a=>a.it!=="Credit"),pend=cr.filter(a=>!D.coll[a.no]);
+  $("app").innerHTML=`<div class="row">${perSel()}</div>
+  <div class="grid"><div class="card stat"><div class="l">Accidental jobs</div><div class="n">${A.length}</div></div><div class="card stat"><div class="l">Total billed</div><div class="n">${lakh(sum(A,a=>a.total))}</div></div><div class="card stat"><div class="l">Billed to insurance (credit)</div><div class="n">${lakh(sum(cr,a=>a.total))}</div><div class="s">${cr.length} bills</div></div><div class="card stat"><div class="l">Insurance still to pay</div><div class="n neg">${lakh(sum(pend,a=>a.total))}</div><div class="s">${pend.length} bills not marked received</div></div><div class="card stat"><div class="l">Paid by customer (cash)</div><div class="n">${lakh(sum(cash,a=>a.total))}</div></div></div>
+  <div class="card" style="margin:12px 0"><h3>By insurance company / party</h3>${bars(groupSum(cr,a=>a.cust,a=>a.total))}</div>
+  ${table(["Date","Invoice","Job card","Party","Labour","Parts","Total","Status"],A.map(a=>[fd(a.date),esc(a.no),`<span class="muted">${esc(a.jc)}</span>`,esc(a.cust),{n:rs(a.labour)},{n:rs(a.parts)},{n:`<b>${rs(a.total)}</b>`},a.it!=="Credit"?`<span class="pill p-ok">Cash paid</span>`:D.coll[a.no]?`<span class="pill p-ok">Received ${fd(D.coll[a.no].date)}</span>`:`<button class="btn s" onclick="markForm('${esc(a.no)}')">Mark received</button>`]),A.length)}`;
+}
+
+/* ---------- to collect ---------- */
+function col(){
+  const B=creditBills(),P=B.filter(b=>!b.got);
+  const grp=groupSum(P,b=>b.cust,b=>b.total);
+  $("app").innerHTML=`<p class="muted">Credit service bills from DMS (insurance claims and credit customers). When the money comes, press <b>Mark received</b> — it then counts in Money received.</p>
+  <div class="grid"><div class="card stat"><div class="l">Pending</div><div class="n neg">${lakh(sum(P,b=>b.total))}</div><div class="s">${P.length} bills</div></div><div class="card stat"><div class="l">Older than 60 days</div><div class="n neg">${lakh(sum(P.filter(b=>diff(b.date)>60),b=>b.total))}</div><div class="s">${P.filter(b=>diff(b.date)>60).length} bills</div></div><div class="card stat"><div class="l">Received (marked)</div><div class="n pos">${lakh(sum(B.filter(b=>b.got),b=>b.got.amt))}</div></div></div>
+  <div class="card" style="margin:12px 0"><h3>Who owes how much</h3>${grp.length?grp.map(([k,v])=>{const a=V(D.acct).find(x=>x.name===k);return `<div class="bar"><span class="t">${esc(k)}${a&&/^[6-9]\d{9}$/.test(a.mobile)&&!/^(\d)\1+$/.test(a.mobile)?`<br><span class="muted">${esc(a.mobile)}</span>`:""}</span><span class="b"><i style="width:${v/grp[0][1]*100}%"></i></span><span class="v">${rs(v)}</span></div>`}).join(""):`<div class="muted">Nothing pending 👍</div>`}</div>
+  ${table(["Bill date","Days","Invoice","Job card","Type","Party","Amount",""],B.sort((a,b)=>!!a.got-!!b.got||a.date.localeCompare(b.date)).map(b=>[fd(b.date),b.got?"":`<span class="pill ${diff(b.date)>60?"p-r":"p-w"}">${diff(b.date)}</span>`,esc(b.no),`<span class="muted">${esc(b.jc)}</span>`,esc(b.jt),esc(b.cust),{n:rs(b.total)},b.got?`<span class="pill p-ok">Received ${rs(b.got.amt)}</span> <button class="btn g s" onclick="undoColl('${esc(b.no)}')">Undo</button>`:`<button class="btn s" onclick="markForm('${esc(b.no)}')">Mark received</button>`]),B.length)}`;
+}
+function markForm(no){const b=D.sv[no];open("Mark received",`<p><b>${esc(b.cust)}</b> · ${esc(b.no)} · bill ${rs(b.total)}</p><div class="form"><div><label>Date received</label><input id="m_d" type="date" value="${today()}"></div><div><label>Amount received ₹</label><input id="m_a" type="number" value="${Math.round(b.total)}"></div><div><label>Mode</label><select id="m_m"><option>Bank</option><option>Cash</option><option>UPI</option></select></div></div><p class="muted">If insurance paid less than the bill, enter the actual amount.</p><button class="btn" onclick="saveColl('${esc(no)}')">Save</button>`)}
+
+/* ---------- parts ---------- */
+function parts(){
+  const r=range(),PP=V(D.pp).filter(p=>inR(p.date,r)),PS=V(D.ps).filter(p=>p.open&&inR(p.date,r)),J=services(r);
+  const st=D.stock,cat=groupSum(st,x=>x.cat,x=>x.val);
+  const ms=months(6);
+  $("app").innerHTML=`<div class="row">${perSel()}</div>
+  <div class="grid"><div class="card stat"><div class="l">Parts stock value</div><div class="n">${lakh(sum(st,x=>x.val))}</div><div class="s">${st.length} part nos · ${Math.round(sum(st,x=>x.qty))} pcs</div></div><div class="card stat"><div class="l">Parts purchased</div><div class="n">${lakh(sum(PP,p=>p.total))}</div><div class="s">${PP.length} invoices</div></div><div class="card stat"><div class="l">Parts used in service</div><div class="n">${lakh(sum(J,j=>j.parts))}</div></div><div class="card stat"><div class="l">Counter sale</div><div class="n">${lakh(sum(PS,p=>p.total))}</div><div class="s">${PS.length} bills</div></div></div>
+  <div class="g2" style="margin:12px 0"><div class="card"><h3>Stock value by category</h3>${cat.length?bars(cat.slice(0,8)):`<div class="muted">Import Parts Stock Report.</div>`}</div>
+  <div class="card"><h3>Parts purchase per month</h3>${cols(ms.map(m=>[ml(m),sum(V(D.pp).filter(p=>p.date.slice(0,7)===m),p=>p.total)]),v=>v>=1e5?(v/1e5).toFixed(1)+"L":Math.round(v/1e3)+"k")}</div>
+  <div class="card"><h3>Purchased from</h3>${bars(groupSum(PP,p=>p.sup,p=>p.total).slice(0,6))}</div>
+  <div class="card"><h3>Counter sale by category (ex-GST)</h3>${bars(groupSum(PS.flatMap(p=>Object.entries(p.cats)),x=>x[0],x=>x[1]).slice(0,6))}</div></div>
+  <h2>Highest-value parts in stock</h2>${table(["Part no.","Name","Category","Qty","Value"],[...st].sort((a,b)=>b.val-a.val).slice(0,60).map(x=>[esc(x.part),esc(x.name),esc(x.cat),{n:x.qty},{n:rs(x.val)}]),Math.min(60,st.length))}`;
+}
+
+/* ---------- money ---------- */
+const HEADS={in:["Finance company payment","Insurance claim","Commission / incentive","Old vehicle sale","Partner put money","Other income"],out:["Distributor payment (vehicles)","Parts supplier payment","Salary","Rent","Electricity","Tea / misc","Transport / freight","Partner withdrawal","Bank charges / EMI","RTO / insurance paid","Other expense"]};
+let mq="";
+function money(){
+  const r=range(),RC=V(D.rc).filter(x=>inR(x.date,r)),EX=D.exp.filter(x=>inR(x.date,r)),CO=Object.entries(D.coll).filter(([,c])=>inR(c.date,r));
+  const rows=[...RC.map(x=>({date:x.date,type:/payment/i.test(x.tt)?"out":"in",amt:x.amt,head:"DMS "+(x.tt||"Receipt")+" · "+(x.mode||""),party:x.party,src:"DMS"})),
+    ...CO.map(([no,c])=>({date:c.date,type:"in",amt:c.amt,head:"Credit bill received",party:(D.sv[no]?.cust||"")+" · "+no,src:"Marked"})),
+    ...EX.map(x=>({...x,party:x.note,src:"Entry"}))].filter(x=>(x.head+x.party).toLowerCase().includes(mq.toLowerCase())).sort((a,b)=>b.date.localeCompare(a.date));
+  const inn=sum(rows.filter(x=>x.type==="in"),x=>x.amt),out=sum(rows.filter(x=>x.type==="out"),x=>x.amt);
+  $("app").innerHTML=`<div class="row"><button class="btn" onclick="expForm('out')">− Add expense / payment</button><button class="btn g" onclick="expForm('in')">+ Add money in</button>${perSel()}<input placeholder="Search" value="${esc(mq)}" oninput="mq=this.value;money();refocus(this)"></div>
+  <div class="note" style="margin-bottom:10px">DMS Payment file has only customer receipts. Salary, rent, distributor payments etc. are not in DMS — add them here (or send a Tally Day Book export and I can add import for it).</div>
+  <div class="grid"><div class="card stat"><div class="l">In</div><div class="n pos">${lakh(inn)}</div></div><div class="card stat"><div class="l">Out</div><div class="n neg">${lakh(out)}</div></div><div class="card stat"><div class="l">Net</div><div class="n">${lakh(inn-out)}</div></div></div>
+  <div class="card" style="margin:12px 0"><h3>Expenses by head</h3>${bars(groupSum(rows.filter(x=>x.type==="out"),x=>x.head,x=>x.amt).slice(0,10))||`<div class="muted">No expenses entered.</div>`}</div>
+  ${table(["Date","Head","Party / details","Source","In","Out",""],rows.slice(0,400).map(x=>[fd(x.date),esc(x.head),`<span class="muted">${esc(x.party)}</span>`,`<span class="pill p-n">${x.src}</span>`,{n:x.type==="in"?`<span class="pos">${rs(x.amt)}</span>`:""},{n:x.type==="out"?`<span class="neg">${rs(x.amt)}</span>`:""},x.src==="Entry"?`<button class="btn g s" onclick="expForm('${x.type}','${x.id}')">Edit</button>`:""]),rows.length)}`;
+}
+function expForm(type,id){const x=D.exp.find(e=>e.id===id)||{date:today(),type,mode:"Cash",head:HEADS[type][0]};
+  open(x.type==="in"?"Money in":"Expense / payment",`<datalist id="hd">${HEADS[x.type].map(h=>`<option>${h}</option>`).join("")}</datalist><div class="form"><div><label>Date</label><input id="e_date" type="date" value="${x.date}"></div><div><label>Head</label><input id="e_head" list="hd" value="${esc(x.head)}"></div><div><label>Amount ₹</label><input id="e_amt" type="number" value="${x.amt||""}"></div><div><label>Mode</label><select id="e_mode">${["Cash","Bank","UPI"].map(m=>`<option ${m===x.mode?"selected":""}>${m}</option>`).join("")}</select></div><div><label>Party / details</label><input id="e_note" value="${esc(x.note)}"></div></div>
+  <div class="row" style="margin-top:12px"><button class="btn" onclick="saveExp('${x.type}','${id||""}')">Save</button>${id?`<button class="btn g" style="margin-left:auto" onclick="delExp('${id}')">Delete</button>`:""}</div>`)}
+function saveExp(type,id){const v={type,date:$("e_date").value,head:$("e_head").value.trim(),amt:N($("e_amt").value),mode:$("e_mode").value,note:$("e_note").value.trim()};if(!v.amt||!v.date)return alert("Enter date and amount");const x=id?Object.assign(D.exp.find(e=>e.id===id),v):{id:uid(),...v};if(!id)D.exp.push(x);save();cPut("exp",x.id,x);dlg.close();render()}
+
+/* ---------- import ---------- */
+function imp(){
+  $("app").innerHTML=`<div class="g2"><div>
+  <label class="drop" id="drop" for="files"><b>DMS की Excel files यहाँ डालें</b><br><span class="muted">एक साथ कई files चुन सकते हैं — app खुद पहचान लेगी कौन-सी report है</span><input type="file" id="files" accept=".xlsx,.xls,.csv" multiple hidden onchange="importFiles(this.files)"></label>
+  ${typeof XLSX==="undefined"?`<p class="neg">Excel reader did not load. Internet is needed to open this app the first time.</p>`:""}
+  <div id="log" style="margin-top:12px"></div></div>
+  <div class="card"><h3>Reports this app reads</h3>
+  ${table(["Report (DMS export)","Rows in app","Last import"],Object.entries(REPORTS).map(([k,v])=>[esc(v.name),{n:k==="stock"?D.stock.length:Object.keys(D[k]).length},D.meta[k]?`${fd(D.meta[k].at)} <span class="muted">${esc(D.meta[k].from)}–${esc(D.meta[k].to)}</span>`:`<span class="muted">not yet</span>`]))}
+  <p class="muted">The same invoice / VIN is updated, never doubled — so every week you can export from 1 April and import again. Parts Stock is replaced with the latest file.</p>
+  ${FB?`<p class="muted">Database: <b>${esc(fbCfg().projectId)}</b> · login ${esc(ME)}</p>${FB_CONFIG?"":`<button class="btn g s" onclick="if(confirm('Disconnect this device from this database? Cloud data is not deleted.')){localStorage.removeItem(FBK);logout()}">Change database</button> `}${rulesBox(ME)}`:""}<button class="btn g s" onclick="clearDMS()">Clear DMS data</button></div></div>`;
+  const dr=$("drop");["dragenter","dragover"].forEach(e=>dr.addEventListener(e,ev=>{ev.preventDefault();dr.classList.add("over")}));["dragleave","drop"].forEach(e=>dr.addEventListener(e,ev=>{ev.preventDefault();dr.classList.remove("over")}));dr.addEventListener("drop",ev=>importFiles(ev.dataTransfer.files));
+}
+async function importFiles(files){
+  if(typeof XLSX==="undefined")return alert("Excel reader not loaded — check internet and reload.");
+  const log=$("log");log.innerHTML=`<div class="card">Reading ${files.length} file(s)…</div>`;const res=[],changed=new Set();
+  for(const f of files){
+    try{
+      const rows=await readWorkbook(f),t=detect(rows);
+      if(!t){res.push(`<tr><td>${esc(f.name)}</td><td colspan="2" class="neg">Not recognised</td></tr>`);continue}
+      const agg=aggregate(t,rows);let added=0,upd=0;
+      changed.add(t);if(t==="stock"){D.stock=agg;added=agg.length}else for(const[k,v]of Object.entries(agg)){if(D[t][k])upd++;else added++;D[t][k]=v}
+      const ds=(t==="stock"||t==="acct")?[]:V(agg).map(x=>x.date).filter(Boolean).sort();
+      D.meta[t]={at:today(),from:ds[0]?fd(ds[0]):"",to:ds.length?fd(ds[ds.length-1]):"",file:f.name};
+      res.push(`<tr><td>${esc(f.name)}</td><td>${esc(REPORTS[t].name)}</td><td class="num">${added} new${upd?`, ${upd} updated`:""}</td></tr>`);
+    }catch(e){res.push(`<tr><td>${esc(f.name)}</td><td colspan="2" class="neg">Error: ${esc(e.message)}</td></tr>`)}
+  }
+  save();imp();$("log").innerHTML=`<div class="card">⏳ Saving to cloud…</div>`;
+  try{await pushDMS(changed)}catch(e){$("log").innerHTML=`<div class="card neg">Cloud save failed: ${esc(e.message||e)} — check internet and import again.</div>`;return}
+  $("log").innerHTML=`<div class="tw"><table><tr><th>File</th><th>Detected as</th><th>Result</th></tr>${res.join("")}</table></div><p><button class="btn" onclick="go('dash')">Open dashboard →</button></p>`;
+}
+
+
+/* ================= cloud (Firebase – same project as Deep Honda) ================= */
+/* Paste the Deepanshu Enterprises Firebase config here (keep null to paste it on the device instead) */
+const FB_CONFIG={apiKey:"AIzaSyD2pxvbbNT5uudWBSCYPs_UJB-PecmKkaU",authDomain:"deepanshu-enterprises.firebaseapp.com",projectId:"deepanshu-enterprises",storageBucket:"deepanshu-enterprises.firebasestorage.app",messagingSenderId:"166861238390",appId:"1:166861238390:web:d7ecc448afafcbeaf02f57"};
+const FBK=KEY+"_fbcfg";
+function fbCfg(){if(FB_CONFIG)return FB_CONFIG;try{return JSON.parse(localStorage.getItem(FBK))||null}catch(e){return null}}
+function parseCfg(t){const o={};String(t||"").replace(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g,(m,k,v)=>{o[k]=v});return o.apiKey&&o.projectId&&o.appId?{apiKey:o.apiKey,authDomain:o.authDomain||"",projectId:o.projectId,storageBucket:o.storageBucket||"",messagingSenderId:o.messagingSenderId||"",appId:o.appId}:null}
+function rulesText(v){const em=[...new Set(String(v||"").split(/[,\s;]+/).map(x=>x.trim().toLowerCase()).filter(x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)))];return `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /shops/${SHOP}/{document=**} {
+      allow read, write: if request.auth != null
+        && request.auth.token.email.lower() in [${em.map(e=>`'${e}'`).join(", ")}];
+    }
+  }
+}`}
+function rulesBox(v){return `<details style="margin-top:12px"><summary>Firestore Rules – which emails can open this data</summary><p class="muted">Type login emails (comma separated), copy the text below into Firebase → Firestore → Rules → Publish.</p><input id="rulesEm" value="${esc(v)}" oninput="$('rulesOut').value=rulesText(this.value)"><textarea id="rulesOut" readonly style="min-height:170px;font:12px ui-monospace,Menlo,monospace;margin-top:6px">${esc(rulesText(v))}</textarea></details>`}
+function setup(){screen(`<h2 style="margin-top:0">Connect Deepanshu Enterprises database</h2><p class="muted">Firebase → Project settings → Your apps → Web app → copy the whole <b>firebaseConfig = { … }</b> block and paste it here.</p><textarea id="fbIn" rows="8" placeholder="const firebaseConfig = {\n  apiKey: &quot;…&quot;,\n  projectId: &quot;…&quot;, …\n};"></textarea><p><button class="btn" onclick="const c=parseCfg($('fbIn').value);if(!c)return alert('Config incomplete — copy the whole firebaseConfig block.');try{localStorage.setItem(FBK,JSON.stringify(c))}catch(e){}location.reload()">Connect</button></p>${rulesBox("aiashwanimaingi@gmail.com, deepanshumaingi@gmail.com")}`)}
+const SHOP="deepanshu-enterprises",FBV="12.19.0",DMSK=["vs","vp","sv","pp","ps","rc","stock","acct"],CH=700000;
+let FB=null,ME="",VER=null,PARTS={},UNSUB=[];
+const sid=k=>String(k).replace(/[\/\s]/g,"_");
+function screen(html){$("nav").innerHTML="";$("app").innerHTML=`<div class="card" style="max-width:440px;margin:40px auto">${html}</div>`}
+function setSync(t){const e=$("sync");if(e)e.textContent=t}
+async function boot(){
+  if(!fbCfg())return setup();
+  screen(`<div class="empty">⏳ Connecting…</div>`);
+  try{
+    const b=`https://www.gstatic.com/firebasejs/${FBV}/`;
+    const [A,U,F]=await Promise.all(["app","auth","firestore"].map(m=>import(b+"firebase-"+m+".js")));
+    const app=A.initializeApp(fbCfg()),auth=U.getAuth(app);
+    let db;try{db=F.initializeFirestore(app,{localCache:F.persistentLocalCache({tabManager:F.persistentMultipleTabManager()})})}catch(e){db=F.getFirestore(app)}
+    FB={U,F,auth,db};
+  }catch(e){screen(`<h2 style="margin-top:0">No internet</h2><p>Internet is needed to open the app.</p><button class="btn" onclick="location.reload()">Try again</button>${noData()?"":` <button class="btn g" onclick="setSync('📴 Offline – old copy');nav();render()">See last saved copy</button>`}`);return}
+  FB.U.onAuthStateChanged(FB.auth,u=>{if(u){ME=u.email||"";$("logoutBtn").style.display="";start()}else{$("logoutBtn").style.display="none";login()}});
+}
+function login(msg=""){
+  setSync("");
+  screen(`<h2 style="margin-top:0">Login – Deepanshu Enterprises</h2>${msg?`<p class="neg">${esc(msg)}</p>`:""}
+  <form onsubmit="doLogin(event)"><label>Email</label><input id="l_e" type="email" autocomplete="username" autocapitalize="none" required>
+  <label style="margin-top:10px">Password</label><input id="l_p" type="password" autocomplete="current-password" required>
+  <p><button class="btn" id="l_b">Login</button></p></form><p class="muted">Project: ${esc(fbCfg().projectId)} · <a href="#" onclick="forgot();return false">Forgot password?</a></p>`);
+}
+const authMsg=er=>{const c=(er&&er.code)||"";return /invalid|wrong-password|user-not-found/.test(c)?"Wrong email or password.":/too-many/.test(c)?"Too many tries. Wait a little.":/network/.test(c)?"No internet.":"Login failed ("+(c||er)+")"};
+async function doLogin(e){e.preventDefault();$("l_b").disabled=true;$("l_b").textContent="⏳";try{await FB.U.signInWithEmailAndPassword(FB.auth,$("l_e").value.trim(),$("l_p").value)}catch(er){login(authMsg(er))}}
+async function forgot(){const em=$("l_e").value.trim();if(!em)return alert("First type your email above.");try{await FB.U.sendPasswordResetEmail(FB.auth,em);alert("Password reset link sent to "+em+" (check Spam too).")}catch(er){alert(authMsg(er))}}
+async function logout(){UNSUB.forEach(u=>{try{u()}catch(e){}});UNSUB=[];try{localStorage.removeItem(KEY)}catch(e){}try{await FB.U.signOut(FB.auth)}catch(e){}location.reload()}
+const R_=(...p)=>FB.F.doc(FB.db,"shops",SHOP,...p),C_=c=>FB.F.collection(FB.db,"shops",SHOP,c);
+function start(){
+  screen(`<div class="empty">⏳ Loading data…</div>`);setSync("⏳");
+  const {F}=FB;let ready={m:0,e:0,c:0};const go1=()=>{if(ready.m&&ready.e&&ready.c){setSync("☁ Synced · "+ME);save();nav();render()}};
+  UNSUB.push(F.onSnapshot(R_("meta","info"),async snap=>{
+    const m=snap.exists()?snap.data():null;
+    if(!m){if(!ready.m){ready.m=1;go1();if(!noData()){setSync("⏳ Uploading this device's data…");try{await pushDMS(DMSK);D.exp.forEach(e=>cPut("exp",e.id,e));Object.entries(D.coll).forEach(([no,v])=>cPut("coll",no,{...v,no}));setSync("☁ Synced · "+ME)}catch(e){cErr(e)}}}return}
+    if(m.ver===VER&&ready.m)return;
+    try{await loadDMS(m)}catch(e){return cErr(e)}
+    VER=m.ver;PARTS=m.parts||{};D.meta=m.meta||{};
+    if(!ready.m){ready.m=1;go1()}else{save();refresh()}
+  },cErr));
+  UNSUB.push(F.onSnapshot(C_("exp"),snap=>{D.exp=snap.docs.map(d=>d.data());if(!ready.e){ready.e=1;go1()}else refresh()},cErr));
+  UNSUB.push(F.onSnapshot(C_("coll"),snap=>{const o={};snap.docs.forEach(d=>{const x=d.data();o[x.no]=x});D.coll=o;if(!ready.c){ready.c=1;go1()}else refresh()},cErr));
+}
+async function loadDMS(m){
+  const snap=await FB.F.getDocs(C_("dms")),parts={};
+  snap.docs.forEach(d=>{const x=d.data();if(x.ver!==m.ver&&m.vers&&x.ver!==m.vers[x.k])return;(parts[x.k]=parts[x.k]||[])[x.i]=x.j});
+  for(const k of DMSK){const n=(m.parts||{})[k]||0;if(!n){D[k]=k==="stock"?[]:{};continue}const a=parts[k]||[];if(a.length<n||a.slice(0,n).some(x=>x==null))throw new Error("Data still uploading – reload in a minute");D[k]=JSON.parse(a.slice(0,n).join(""))}
+}
+async function pushDMS(keys){
+  const {F}=FB,ver=Date.now(),vers={...(await curMeta()).vers},parts={...PARTS};
+  for(const k of keys){const j=JSON.stringify(D[k]),n=Math.max(1,Math.ceil(j.length/CH));
+    for(let i=0;i<n;i++)await F.setDoc(R_("dms",k+"_"+i),{k,i,ver,j:j.slice(i*CH,(i+1)*CH)});
+    for(let i=n;i<(PARTS[k]||0);i++)await F.deleteDoc(R_("dms",k+"_"+i));
+    parts[k]=n;vers[k]=ver}
+  await F.setDoc(R_("meta","info"),{ver,parts,vers,meta:D.meta,by:ME,at:F.serverTimestamp()});
+  VER=ver;PARTS=parts;
+}
+async function curMeta(){try{const s=await FB.F.getDoc(R_("meta","info"));return s.exists()?s.data():{}}catch(e){return{}}}
+function cPut(c,id,obj){if(!FB)return;setSync("⏳ Saving…");FB.F.setDoc(R_(c,sid(id)),{...obj,by:ME}).then(()=>setSync("☁ Synced · "+ME),cErr)}
+function cDel(c,id){if(!FB)return;setSync("⏳ Saving…");FB.F.deleteDoc(R_(c,sid(id))).then(()=>setSync("☁ Synced · "+ME),cErr)}
+function cErr(e){const c=(e&&e.code)||"";if(/permission-denied/.test(c)){UNSUB.forEach(u=>{try{u()}catch(x){}});UNSUB=[];screen(`<h2 style="margin-top:0">Access not given</h2><p><b>${esc(ME)}</b> cannot open this data yet. Add this email in Firebase → Firestore → Rules.</p>${rulesBox(ME)}<button class="btn" onclick="logout()">Logout</button>`);return}setSync("⚠ "+(c||e.message||e))}
+function refresh(){if(dlg.open)return;const a=document.activeElement;if(a&&/INPUT|SELECT|TEXTAREA/.test(a.tagName)&&$("app").contains(a))return;nav();render()}
+function saveColl(no){const v={no,date:$("m_d").value,amt:N($("m_a").value),mode:$("m_m").value};D.coll[no]=v;save();cPut("coll",no,v);dlg.close();nav();render()}
+function undoColl(no){delete D.coll[no];save();cDel("coll",no);nav();render()}
+function delExp(id){if(!confirm("Delete this entry?"))return;D.exp=D.exp.filter(e=>e.id!==id);save();cDel("exp",id);dlg.close();render()}
+async function clearDMS(){if(!confirm("Delete all DMS data for everyone? Expense entries and marked receipts stay."))return;const k=D.exp,c=D.coll;D=EMPTY();D.exp=k;D.coll=c;save();await pushDMS(DMSK);imp()}
+async function restoreAll(x){D=Object.assign(EMPTY(),x);save();screen(`<div class="empty">⏳ Uploading backup…</div>`);await pushDMS(DMSK);for(const e of D.exp)cPut("exp",e.id,e);for(const [no,v] of Object.entries(D.coll))cPut("coll",no,{...v,no});nav();render()}
+
+/* ---------- helpers ---------- */
+function open(t,html){$("dlgT").textContent=t;$("dlgB").innerHTML=html;if(!dlg.open)dlg.showModal()}
+function dl(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click()}
+function backup(){dl(new Blob([JSON.stringify(D)],{type:"application/json"}),`deepanshu-enterprises-backup-${today()}.json`)}
+function restore(inp){const fl=inp.files[0];if(!fl)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.vs||!x.sv)throw 0;if(confirm("Replace all data (for everyone) with this backup?"))restoreAll(x)}catch(e){alert("Not a valid backup file")}};r.readAsText(fl);inp.value=""}
+const dlg=$("dlg");
+boot();
+</script>
+</body>
+</html>
