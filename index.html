@@ -357,7 +357,7 @@ function daily(){
 
 /* ---------- finance (company advances & files) ---------- */
 const COS=["Hero FinCorp","IDFC First Bank","Bajaj Finance","Muthoot","HDB Financial","L&T Finance"];
-let fco="",fst="pending",fq="";
+let fco="",fst="pending",fq="",finView="";
 function saleNo(t){t=String(t||"").trim().toUpperCase();if(!t)return"";if(D.vs&&V(D.vs).some(x=>x.no===t))return t;const m=V(D.vs).filter(x=>x.open&&(x.no.endsWith(t)||x.no.endsWith("S"+t.replace(/^S/,""))));return m.length===1?m[0].no:t}
 const finOf=no=>D.fin.find(f=>f.inv&&saleNo(f.inv)===no);
 function coList(){return[...new Set([...D.fin.map(f=>f.co),...D.finpay.map(p=>p.co)].filter(Boolean))]}
@@ -366,9 +366,10 @@ function coAcc(co){const F=D.fin.filter(f=>f.co===co),P=D.finpay.filter(p=>p.co=
   return{co,files:F.length,recd,done,bal:recd-done,pendN:pend.length,pendAmt:sum(pend,f=>f.amt),old:pend.filter(f=>diff(f.date)>15).length}}
 function finSum(){const a=coList().map(coAcc);return{pendN:sum(a,x=>x.pendN),pendAmt:sum(a,x=>x.pendAmt),bal:sum(a,x=>x.bal)}}
 function fin(){
+  if(finView==="reg"){$("app").innerHTML=regView();return}
   const cos=coList(),acc=cos.map(coAcc);
   const L=D.fin.filter(f=>(!fco||f.co===fco)&&(fst==="all"||(fst==="done"?f.status==="done":f.status!=="done"))&&(f.cust+f.model+f.inv+f.co).toLowerCase().includes(fq.toLowerCase())).sort((a,b)=>fst==="done"?(b.doneDate||"").localeCompare(a.doneDate||""):a.date.localeCompare(b.date));
-  $("app").innerHTML=`<div class="row"><button class="btn" onclick="finForm()">+ Finance file</button><button class="btn g" onclick="payForm()">+ Money from finance company</button></div>
+  $("app").innerHTML=`<div class="row"><button class="btn" onclick="finForm()">+ Finance file</button><button class="btn g" onclick="payForm()">+ Money from finance company</button><button class="btn g" onclick="finView='reg';fin()">📒 Register → DMS</button></div>
   <p class="muted" style="margin-top:0">Company advance/payment आए तो <b>Money from finance company</b> में डालें। Company जब किसी file का पैसा काट ले (adjust कर दे) तो उस file पर <b>Mark adjusted</b> दबाएँ।</p>
   ${acc.length?`<div class="grid">${acc.map(a=>`<div class="card stat click" onclick="fco='${esc(a.co)}';fin()" style="${fco===a.co?"border-color:var(--red)":""}"><div class="l"><b>${esc(a.co)}</b></div>
     <div class="n ${a.bal>=0?"pos":"neg"}">${rs(Math.abs(a.bal))}</div><div class="s">${a.bal>=0?"advance बचा है (हमारे पास)":"company से लेना है"}</div>
@@ -414,6 +415,95 @@ function ledger(co){
   let bal=0;const out=rows.map(r=>{bal+=(r.cr||0)-(r.dr||0);return[fd(r.date),esc(r.t),{n:r.cr?`<span class="pos">${rs(r.cr)}</span>`:""},{n:r.dr?rs(r.dr):""},{n:`<b class="${bal>=0?"pos":"neg"}">${rs(bal)}</b>`},r.pay?`<button class="btn g s" onclick="payForm('${r.id}')">Edit</button>`:""]});
   const a=coAcc(co);
   open("Khata – "+co,`<p>Balance: <b class="${a.bal>=0?"pos":"neg"}">${rs(Math.abs(a.bal))}</b> ${a.bal>=0?"advance हमारे पास बचा है":"company से लेना है"} · Pending files: <b>${a.pendN}</b> (${rs(a.pendAmt)})</p>${table(["Date","Details","Received","File adjusted","Balance",""],out.reverse())}`)}
+
+
+/* ---------- register → DMS matcher (finance) ---------- */
+let RG=null,regTxt="";
+const REG_PAGE1=`270 Asha Rani 74699 BF
+271 Ashu Kumar 58153 MCSL
+272 Mandeep 72049 SR
+273 Shubham 80780 SR
+274 Nitish Kumar 78588 HDB
+278 Sandeep Singh 64000 SR
+279 Anil 72599 BF
+280 Cash
+281 Vikas 76000 SR
+283 Siya Ram 68910 Muthoot
+284 Happy 38603 MCSL
+285 Manish 78550 MCSL
+286 Abhishek 76400 SR
+287 Arvind Kumar 59384 IDFC
+288 Parmod Kumar 77278 SR
+289 Rohit 10968+5032+74368 BF`;
+const CO_DEF={BF:"Bajaj Finance",SR:"Shriram Finance",MCSL:"Muthoot Capital (MCSL)",HDB:"HDB Financial",IDFC:"IDFC First Bank",MUTHOOT:"Muthoot",HFCL:"Hero FinCorp",HERO:"Hero FinCorp",LT:"L&T Finance"};
+function coMap(){let m={};try{m=JSON.parse(localStorage.getItem("de_comap")||"{}")}catch(e){}return{...CO_DEF,...m}}
+function coFull(c){c=String(c||"").trim();if(!c)return"";const k=c.toUpperCase().replace(/[^A-Z&]/g,"");const m=coMap();if(m[k])return m[k];const hit=coList().find(x=>nz(x)===nz(c));return hit||c}
+function sNum(no){const m=String(no||"").match(/S(\d+)$/i);return m?+m[1]:null}
+function nSkel(t){return t.toLowerCase().replace(/[^a-z]/g,"").replace(/h/g,"").replace(/w/g,"v").replace(/z/g,"s").replace(/y/g,"i").replace(/ee/g,"i").replace(/oo/g,"u").replace(/(.)\1+/g,"$1")}
+function nToks(s){return String(s||"").split(/[\s.]+/).map(nSkel).filter(t=>t.length>1)}
+function dice(a,b){if(a===b)return 1;if(a.length<2||b.length<2)return 0;const g=s=>{const o=[];for(let i=0;i<s.length-1;i++)o.push(s.slice(i,i+2));return o};const A=g(a),B=g(b).slice();let n=0;A.forEach(x=>{const i=B.indexOf(x);if(i>=0){n++;B.splice(i,1)}});return 2*n/(A.length+g(b).length)}
+function nameSim(a,b){const A=nToks(a),B=nToks(b);if(!A.length||!B.length)return 0;const f=Math.max(dice(A[0],B[0]),A[0].startsWith(B[0])||B[0].startsWith(A[0])?.85:0);
+  if(A.length>1&&B.length>1){const s=Math.max(...A.slice(1).map(x=>Math.max(...B.slice(1).map(y=>dice(x,y)))));return f*.75+s*.25}return f*.75+.15}
+function regParse(txt){return String(txt||"").split(/\n/).map(l=>l.trim()).filter(Boolean).map(l=>{
+  const m=l.match(/^(\d+)?[\s.,:-]*(.*?)\s*((?:\d[\d,]*\s*\+\s*)*\d[\d,]{2,})\s*([A-Za-z&.][A-Za-z&. ]*)?$/);
+  if(!m){const r=l.match(/^(\d+)?[\s.,:-]*(.*)$/);return{reg:r[1]||"",name:r[2],amt:0,code:"",skip:true,line:l}}
+  if(!m[2].trim()||/^cash$/i.test((m[4]||"").trim())||/cash/i.test(m[2]))return{reg:m[1]||"",name:m[2],amt:0,code:"",skip:true,line:l};
+  const parts=m[3].split("+").map(x=>N(x));return{reg:m[1]||"",name:m[2].trim(),amt:parts[parts.length-1],extra:parts.length>1?m[3].replace(/\s/g,""):"",code:(m[4]||"").trim(),line:l}})}
+function regCands(it,taken){const S=V(D.vs).filter(s=>s.open);const out=[];
+  S.forEach(s=>{const linked=D.fin.find(f=>f.id!==it.fid&&f.inv&&saleNo(f.inv)===s.no&&f.amt);if(linked)return;
+    const ns=nameSim(it.name,s.cust);if(ns<.5)return;const n=sNum(s.no),d=it.reg&&n!=null?Math.abs(n-it.reg):null;
+    const close=d==null?0:d<=15?1-d/16:d<=60?.1:-1;if(close<0&&it.reg)return;
+    out.push({s,ns,d,sc:ns*.6+Math.max(close,0)*.4})});
+  if(!out.length&&it.reg)S.forEach(s=>{const ns=nameSim(it.name,s.cust);if(ns>=.7&&!D.fin.find(f=>f.id!==it.fid&&f.inv&&saleNo(f.inv)===s.no))out.push({s,ns,d:null,sc:ns*.5})});
+  return out.sort((a,b)=>b.sc-a.sc).slice(0,6)}
+function regBuild(items){const used={};items.forEach(it=>{it.reg=it.reg?+it.reg:null;it.co=it.co||coFull(it.code);it.cands=it.skip?[]:regCands(it)});
+  const order=items.filter(i=>i.cands.length).sort((a,b)=>b.cands[0].sc-a.cands[0].sc);
+  order.forEach(it=>{const c=it.cands.find(c=>!used[c.s.no]);it.pick=c?c.s.no:"";if(c)used[c.s.no]=1;
+    const o=it.cands.find(x=>x!==c);it.sure=!!c&&c===it.cands[0]&&c.sc>=.72&&(!o||c.sc-o.sc>=.12)});
+  items.forEach(it=>{if(it.extra)it.sure=false;it.inc=!it.skip&&!!it.amt&&!it.dupe});return items}
+function regDupe(it){return D.fin.find(f=>f.id!==it.fid&&((it.reg&&String(f.reg||"")===String(it.reg))||(nz(f.cust)===nz(it.name)&&Math.abs(N(f.amt)-it.amt)<1)))}
+function regStart(fromTxt){
+  if(fromTxt){const rows=regParse(regTxt).map(r=>({...r,src:"reg"}));rows.forEach(r=>{const d=regDupe({...r,reg:+r.reg||null});if(d){r.dupe=d}});RG=regBuild(rows)}
+  else{const bad=D.fin.filter(f=>f.status!=="done"&&f.amt&&(()=>{const s=f.inv&&V(D.vs).find(x=>x.no===saleNo(f.inv)&&x.open);return!s||nameSim(f.cust,s.cust)<.6})());
+    RG=regBuild(bad.map(f=>({fid:f.id,src:"fix",reg:f.reg||(/^\d{1,4}$/.test(String(f.inv||"").trim())?f.inv:""),name:f.cust,amt:N(f.amt),co:f.co,code:"",oldInv:f.inv})))}
+  finView="reg";fin()}
+function regView(){
+  const it=RG||[];const nOk=it.filter(i=>i.inc&&i.pick).length;
+  return `<div class="row"><button class="btn g" onclick="finView='';RG=null;fin()">← Finance</button><h2 style="margin:0">📒 Register → DMS</h2></div>
+  <div class="card"><p style="margin-top:0">रजिस्टर में <b>नंबर · नाम · रकम · कंपनी</b> है, DMS में <b>बिल नंबर · चेसिस · नाम · तारीख</b>। यहाँ हर लाइन को <b>नाम</b> और <b>पास वाले बिल नंबर</b> से DMS की बिक्री से जोड़ा जाता है। रजिस्टर का नंबर DMS के बिल नंबर से थोड़ा आगे-पीछे होता है, इसलिए दोनों देखकर सबसे सही बिक्री चुनी जाती है।</p>
+  <label>रजिस्टर की लाइनें — एक लाइन में एक गाड़ी: <span class="muted">नंबर नाम रकम कंपनी</span> (जैसे <code>272 Mandeep 72049 SR</code>)</label>
+  <textarea id="rg_t" rows="8" style="width:100%;font-family:monospace" oninput="regTxt=this.value">${esc(regTxt)}</textarea>
+  <div class="row" style="margin-top:8px"><button class="btn" onclick="regTxt=$('rg_t').value;regStart(1)">DMS से मिलाओ</button>
+  <button class="btn g" onclick="regTxt=REG_PAGE1;$('rg_t').value=regTxt">रजिस्टर पेज (270–289) भरें</button>
+  <button class="btn g" onclick="regStart(0)">पहले से डली files जाँचें</button>
+  <button class="btn g" onclick="regCodes()">कंपनी के short code</button></div>
+  <p class="muted">"पहले से डली files जाँचें" = जो finance files (staff वाली भी) किसी DMS बिक्री से ठीक से नहीं जुड़ीं, उन्हें यहाँ लाकर जोड़ें।</p></div>
+  ${it.length?`<div class="row"><span class="pill p-ok">${it.filter(i=>i.sure&&i.inc).length} पक्का मिला</span><span class="pill p-w">${it.filter(i=>i.inc&&i.pick&&!i.sure).length} जाँच लें</span><span class="pill p-r">${it.filter(i=>!i.skip&&!i.pick&&!i.dupe).length} नहीं मिला</span>${it.some(i=>i.dupe)?`<span class="pill p-r">${it.filter(i=>i.dupe).length} पहले से डली</span>`:""}</div>
+  <div class="tw"><table><tr><th>✓</th><th>Reg no.</th><th>Register में नाम</th><th>Amount</th><th>Company</th><th>DMS बिक्री (बिल · तारीख · नाम · मॉडल · चेसिस)</th><th></th></tr>
+  ${it.map((r,i)=>r.skip?`<tr class="muted"><td></td><td>${esc(r.reg||"")}</td><td colspan="5">${esc(r.line)} — छोड़ा (रकम नहीं / Cash)</td></tr>`:`<tr>
+   <td><input type="checkbox" ${r.inc?"checked":""} onchange="RG[${i}].inc=this.checked;fin()"></td><td>${esc(r.reg||"")}</td>
+   <td><b>${esc(r.name)}</b>${r.extra?`<div class="neg">रजिस्टर: ${esc(r.extra)} — रकम जाँचें</div>`:""}${r.oldInv?`<div class="muted">लिखा था: ${esc(r.oldInv)}</div>`:""}${r.dupe?`<div class="neg">⚠ पहले से है: ${esc(r.dupe.cust)} · ${rs(r.dupe.amt)}</div>`:""}</td>
+   <td><input type="number" style="width:95px" value="${r.amt||""}" onchange="RG[${i}].amt=N(this.value)"></td>
+   <td><input list="coL" style="width:150px" value="${esc(r.co)}" onchange="RG[${i}].co=this.value.trim()"></td>
+   <td><select style="max-width:430px" onchange="RG[${i}].pick=this.value;RG[${i}].sure=false;fin()"><option value="">— कोई नहीं / बाद में —</option>${r.cands.map(c=>`<option value="${esc(c.s.no)}" ${c.s.no===r.pick?"selected":""}>${esc(c.s.no.replace(/^66115/,""))} · ${fd(c.s.date)} · ${esc(c.s.cust)} · ${esc(c.s.model)} · ${esc(c.s.vin)}${c.d!=null?` (±${c.d})`:""}</option>`).join("")}</select>${(()=>{const s=r.pick&&V(D.vs).find(x=>x.no===r.pick);return s?`<div class="muted">चेसिस <b>${esc(s.vin)}</b> · ${fd(s.date)}</div>`:""})()}</td>
+   <td>${r.dupe?`<span class="pill p-r">Double</span>`:!r.pick?`<span class="pill p-r">नहीं मिला</span>`:r.sure?`<span class="pill p-ok">✔ पक्का</span>`:`<span class="pill p-w">? जाँचें</span>`}</td></tr>`).join("")}</table></div>
+  <datalist id="coL">${[...new Set([...coList(),...COS,...V(coMap())])].map(c=>`<option>${esc(c)}</option>`).join("")}</datalist>
+  <div class="row" style="margin-top:10px"><button class="btn" onclick="regSave()">✓ लगे हुए ${it.filter(i=>i.inc).length} files Save करें</button><span class="muted">बिना DMS बिक्री वाली लाइन भी save होगी (बाद में Edit से जोड़ सकते हैं)।</span></div>`:""}`}
+function regCodes(){const m=coMap();const ks=[...new Set([...Object.keys(m),...(RG||[]).map(r=>String(r.code||"").toUpperCase().replace(/[^A-Z&]/g,"")).filter(Boolean)])];
+  open("कंपनी के short code",`<p class="muted">रजिस्टर में लिखे code का पूरा नाम। गलत हो तो बदल दें — आगे से यही लगेगा।</p><div class="form">${ks.map(k=>`<div><label>${esc(k)}</label><input data-k="${esc(k)}" class="cm" list="coL" value="${esc(m[k]||"")}"></div>`).join("")}</div>
+  <datalist id="coL">${[...new Set([...coList(),...COS])].map(c=>`<option>${esc(c)}</option>`).join("")}</datalist>
+  <button class="btn" style="margin-top:10px" onclick="const o={};document.querySelectorAll('.cm').forEach(i=>{if(i.value.trim())o[i.dataset.k]=i.value.trim()});localStorage.setItem('de_comap',JSON.stringify(o));(RG||[]).forEach(r=>{if(r.code)r.co=coFull(r.code)});dlg.close();fin()">Save</button>`)}
+function regSave(){const L=(RG||[]).filter(r=>r.inc&&!r.skip);if(!L.length)return alert("कोई लाइन चुनी नहीं");
+  const bad=L.filter(r=>!r.amt||!r.co);if(bad.length)return alert("इनमें रकम या कंपनी खाली है: "+bad.map(r=>r.reg+" "+r.name).join(", "));
+  const picks=L.map(r=>r.pick).filter(Boolean);const twice=picks.filter((p,i)=>picks.indexOf(p)!==i);if(twice.length)return alert("एक ही DMS बिक्री दो लाइनों में चुनी गई: "+[...new Set(twice)].join(", "));
+  const dup=L.map(r=>({r,d:regDupe(r)||(r.pick&&D.fin.find(f=>f.id!==r.fid&&f.inv&&saleNo(f.inv)===r.pick))})).filter(x=>x.d);
+  if(!dupOK(dup.map(x=>`${x.r.reg} ${x.r.name} ↔ ${x.d.cust} · ${x.d.co} · ${rs(x.d.amt)}`)))return;
+  let n=0;L.forEach(r=>{const s=r.pick&&V(D.vs).find(x=>x.no===r.pick);
+    const v={reg:r.reg?String(r.reg):"",amt:r.amt,co:r.co,...(s?{inv:s.no,vin:s.vin,cust:s.cust,model:s.model,date:s.date}:{cust:r.name}),note:[r.reg?"Reg "+r.reg:"",s&&nz(s.cust)!==nz(r.name)?"Register: "+r.name:"",r.extra?"Register amt: "+r.extra:""].filter(Boolean).join(" · ")};
+    let x;if(r.fid){x=D.fin.find(f=>f.id===r.fid);if(!x)return;if(x.note&&!v.note.includes(x.note))v.note=(x.note+" · "+v.note).replace(/ · $/,"");Object.assign(x,v)}
+    else{x={id:uid(),status:"pending",doneDate:"",date:v.date||today(),...v};D.fin.push(x)}
+    save();cPut("fin",x.id,x);n++});
+  alert(n+" finance files saved ✔");RG=null;regTxt="";finView="";fin()}
 
 /* ---------- vehicles ---------- */
 let vehView="sales",vq="";
