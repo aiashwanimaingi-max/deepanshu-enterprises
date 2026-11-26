@@ -670,12 +670,12 @@ function oldListSave(){const L=$("ol_t").value.split(/\n/).map(x=>x.trim().toUpp
   L.forEach(reg=>{if(D.old.some(o=>nz(o.reg)===nz(reg))){sk.push(reg);return}const o={id:uid(),reg,status:"stock",date:"",note:"सूची से"};D.old.push(o);cPut("old",o.id,o);n++});save();dlg.close();render();alert(`${n} गाड़ियाँ जुड़ीं`+(sk.length?`\nपहले से थीं (छोड़ी): ${sk.join(", ")}`:""))}
 
 /* ---------- vehicles ---------- */
-let vehView="sales",vq="";
+let vehView="sales",vq="",vch="";
 function veh(){
   const r=range();
-  const head=`<div class="row"><span class="seg"><button class="${vehView==="sales"?"on":""}" onclick="vehView='sales';veh()">Sales</button><button class="${vehView==="stock"?"on":""}" onclick="vehView='stock';veh()">Stock</button></span>${vehView==="sales"?perSel():""}<input placeholder="Search name / model / VIN / चालान" value="${esc(vq)}" oninput="vq=this.value;veh();refocus(this)"></div>`;
+  const head=`<div class="row"><span class="seg"><button class="${vehView==="sales"?"on":""}" onclick="vehView='sales';veh()">Sales</button><button class="${vehView==="stock"?"on":""}" onclick="vehView='stock';veh()">Stock</button></span>${vehView==="sales"?perSel()+`<span class="seg">${[["","सब"],["y","चालान डला ✔"],["n","बिना चालान"]].map(([v,l])=>`<button class="${vch===v?"on":""}" onclick="vch='${v}';veh()">${l}</button>`).join("")}</span>`:""}<input placeholder="Search name / model / VIN / चालान" value="${esc(vq)}" oninput="vq=this.value;veh();refocus(this)"></div>`;
   if(vehView==="sales"){
-    const S=sales(r).filter(s=>(s.cust+s.model+s.vin+s.no+" "+(chalOf(s.no)?"ch"+chalOf(s.no).ch+" "+chalOf(s.no).ch:"")).toLowerCase().includes(vq.toLowerCase())).sort((a,b)=>b.date.localeCompare(a.date)||b.no.localeCompare(a.no));
+    const S=sales(r).filter(s=>!vch||(vch==="y"?!!chalOf(s.no):!chalOf(s.no))).filter(s=>(s.cust+s.model+s.vin+s.no+" "+(chalOf(s.no)?"ch"+chalOf(s.no).ch+" "+chalOf(s.no).ch:"")).toLowerCase().includes(vq.toLowerCase())).sort((a,b)=>b.date.localeCompare(a.date)||b.no.localeCompare(a.no));
     const wm=S.filter(s=>margin(s)!==null),mg=sum(wm,margin),low=wm.filter(s=>margin(s)<1000);
     const byM=groupSum(S,s=>s.model,()=>1);
     $("app").innerHTML=head+`<div class="grid"><div class="card stat"><div class="l">Vehicles sold</div><div class="n">${S.length}</div></div><div class="card stat"><div class="l">Sale value</div><div class="n">${lakh(sum(S,s=>s.bill))}</div></div><div class="card stat"><div class="l">Margin (ex-GST)</div><div class="n pos">${lakh(mg)}</div><div class="s">avg ${rs(wm.length?mg/wm.length:0)}</div></div><div class="card stat"><div class="l">Discount given</div><div class="n neg">${lakh(sum(S,s=>s.disc))}</div></div><div class="card stat"><div class="l">Sold below ₹1,000 margin</div><div class="n ${low.length?"neg":""}">${low.length}</div></div></div>
