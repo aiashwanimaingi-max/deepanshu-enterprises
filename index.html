@@ -1088,7 +1088,7 @@ function imp(){
   <div id="log" style="margin-top:12px"></div></div>
   <div class="card"><h3>Reports this app reads</h3>
   ${table(["Report (DMS export)","Rows in app","Last import"],Object.entries(REPORTS).map(([k,v])=>[esc(v.name),{n:k==="stock"?D.stock.length:Object.keys(D[k]).length},D.meta[k]?`${fd(D.meta[k].at)} <span class="muted">${esc(D.meta[k].from)}–${esc(D.meta[k].to)}</span>`:`<span class="muted">not yet</span>`]))}
-  <p class="muted">The same invoice / VIN is updated, never doubled — so every week you can export from 1 April and import again. Parts Stock is replaced with the latest file.</p>
+  <p><button class="btn g s" onclick="cloudCheck()">☁ Cloud जाँच (डेटा ग़ायब लगे तो)</button></p><div id="cc_out" style="margin-bottom:10px"></div><p class="muted">The same invoice / VIN is updated, never doubled — so every week you can export from 1 April and import again. Parts Stock is replaced with the latest file.</p>
   ${FB?`<p class="muted">Database: <b>${esc(fbCfg().projectId)}</b> · login ${esc(ME)}</p>${FB_CONFIG?"":`<button class="btn g s" onclick="if(confirm('Disconnect this device from this database? Cloud data is not deleted.')){localStorage.removeItem(FBK);logout()}">Change database</button> `}${rulesBox(ME,"")}`:""}<button class="btn g s" onclick="clearDMS()">Clear DMS data</button></div></div>`;
   const dr=$("drop");["dragenter","dragover"].forEach(e=>dr.addEventListener(e,ev=>{ev.preventDefault();dr.classList.add("over")}));["dragleave","drop"].forEach(e=>dr.addEventListener(e,ev=>{ev.preventDefault();dr.classList.remove("over")}));dr.addEventListener("drop",ev=>importFiles(ev.dataTransfer.files));
 }
@@ -1215,14 +1215,30 @@ async function loadDMS(m){
   for(const k of DMSK){const n=(m.parts||{})[k]||0;if(!n){D[k]=k==="stock"?[]:{};continue}const a=parts[k]||[];if(a.length<n||a.slice(0,n).some(x=>x==null))throw new Error("Data still uploading – reload in a minute");D[k]=JSON.parse(a.slice(0,n).join(""))}
 }
 async function pushDMS(keys){
-  const {F}=FB,ver=Date.now(),vers={...(await curMeta()).vers},parts={...PARTS};
+  const {F}=FB,ver=Date.now(),cm=await curMeta(),vers={...(cm.vers||{})},parts={...PARTS,...(cm.parts||{})},was={...parts};
   for(const k of keys){const j=JSON.stringify(D[k]),n=Math.max(1,Math.ceil(j.length/CH));
     for(let i=0;i<n;i++)await F.setDoc(R_("dms",k+"_"+i),{k,i,ver,j:j.slice(i*CH,(i+1)*CH)});
-    for(let i=n;i<(PARTS[k]||0);i++)await F.deleteDoc(R_("dms",k+"_"+i));
+    for(let i=n;i<(was[k]||0);i++)await F.deleteDoc(R_("dms",k+"_"+i));
     parts[k]=n;vers[k]=ver}
   await F.setDoc(R_("meta","info"),{ver,parts,vers,meta:D.meta,by:ME,at:F.serverTimestamp()});
   VER=ver;PARTS=parts;
 }
+let CC={};
+const dmsHave=k=>k==="stock"?D.stock.length:Object.keys(D[k]||{}).length;
+async function cloudCheck(){const out=$("cc_out");out.innerHTML="⏳ Cloud देखा जा रहा है…";
+  try{const ms=await FB.F.getDoc(R_("meta","info")),m=ms.exists()?ms.data():null,snap=await FB.F.getDocs(C_("dms")),by={};
+    snap.docs.forEach(d=>{const x=d.data();if(!x||x.k==null)return;((by[x.k]=by[x.k]||{})[x.ver]=by[x.k][x.ver]||[])[x.i]=x.j});
+    CC={};const tm=v=>new Date(+v).toLocaleString("en-IN",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});
+    const rows=DMSK.map(k=>{const want=m&&m.parts?m.parts[k]||0:0,vs=Object.keys(by[k]||{}).sort((a,b)=>b-a);
+      const info=vs.map(v=>{const a=by[k][v];let n=0;while(a[n]!=null)n++;let cnt=null;try{const o=JSON.parse(a.slice(0,n).join(""));cnt=Array.isArray(o)?o.length:Object.keys(o).length;if(cnt&&!CC[k])CC[k]={v:+v,o}}catch(e){}return`${tm(v)}: ${n} भाग · ${cnt==null?"<span class='neg'>अधूरा</span>":"<b>"+cnt+"</b> rows"}`});
+      return[esc(REPORTS[k].name),{n:dmsHave(k)},want?`${want} भाग · ${tm(m.vers&&m.vers[k]||m.ver)}`:`<span class="neg">नहीं</span>`,info.join("<br>")||`<span class="neg">कुछ नहीं</span>`]});
+    const rec=Object.keys(CC).filter(k=>!dmsHave(k));
+    out.innerHTML=`<p class="muted">Cloud index (meta/info): ${m?"है":"<b class='neg'>नहीं मिला</b>"}</p>${table(["Report","App में rows","Cloud index","Cloud में रखा डेटा"],rows)}${rec.length?`<div class="note" style="margin-top:8px">Cloud में <b>${rec.map(k=>esc(REPORTS[k].name)).join(", ")}</b> का डेटा मिला जो app में नहीं दिख रहा। <button class="btn s" onclick="cloudRecover()">↻ यह डेटा वापस लाएँ</button></div>`:`<p class="muted">Cloud में ऐसा कोई डेटा नहीं मिला जो app में न दिख रहा हो।</p>`}`}
+  catch(e){out.innerHTML=`<span class="neg">जाँच नहीं हो पाई: ${esc(e.message||e)}</span>`}}
+async function cloudRecover(){const ks=Object.keys(CC).filter(k=>!dmsHave(k));if(!ks.length)return;
+  if(!confirm("Cloud में मिला यह डेटा वापस लाएँ?\n"+ks.map(k=>"• "+REPORTS[k].name+" ("+(Array.isArray(CC[k].o)?CC[k].o.length:Object.keys(CC[k].o).length)+" rows)").join("\n")+"\n\n(बाकी कुछ नहीं बदलेगा)"))return;
+  ks.forEach(k=>D[k]=CC[k].o);save();$("cc_out").innerHTML="⏳ Cloud में save हो रहा है…";try{await pushDMS(ks)}catch(e){return alert("Cloud में save नहीं हुआ: "+(e.message||e))}
+  alert("डेटा वापस आ गया ✔");nav();go("dash")}
 async function curMeta(){try{const s=await FB.F.getDoc(R_("meta","info"));return s.exists()?s.data():{}}catch(e){return{}}}
 function cPut(c,id,obj){if(!FB)return;setSync("⏳ Saving…");FB.F.setDoc(R_(c,sid(id)),{...obj,by:obj.by||ME}).then(()=>setSync("☁ Synced · "+ME),cErr)}
 function cDel(c,id){if(!FB)return;setSync("⏳ Saving…");FB.F.deleteDoc(R_(c,sid(id))).then(()=>setSync("☁ Synced · "+ME),cErr)}
