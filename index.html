@@ -67,7 +67,7 @@ dialog .bd{padding:16px;max-height:80vh;overflow:auto}
 <script>
 /* ================= data ================= */
 const KEY="deepanshuHeroDMS_v2";
-const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},fin:[],finpay:[],snap:{},wc:{},areg:[],dupok:{},meta:{}});
+const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},fin:[],finpay:[],snap:{},wc:{},areg:[],dupok:{},meta:{},chal:{},old:[]});
 let D=EMPTY();
 try{const s=localStorage.getItem(KEY);if(s)D=Object.assign(EMPTY(),JSON.parse(s))}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){alert("Browser storage is full or blocked. Take a Backup file.")}}
@@ -159,11 +159,11 @@ function cols(items,fmt){const mx=Math.max(1,...items.map(x=>x[1]));return `<div
 function groupSum(a,kf,vf){const o={};a.forEach(x=>{const k=kf(x)||"Other";o[k]=(o[k]||0)+vf(x)});return Object.entries(o).sort((a,b)=>b[1]-a[1])}
 
 /* ================= views ================= */
-const TABS={dash:"Dashboard",daily:"Daily",fin:"Finance",veh:"Vehicles",svc:"Service",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",money:"Money & Expenses",imp:"Import DMS files"};
+const TABS={dash:"Dashboard",daily:"Daily",fin:"Finance",veh:"Vehicles",svc:"Service",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",money:"Money & Expenses",oldb:"Old bikes",imp:"Import DMS files"};
 let tab="dash";
 function nav(){const dn=dupScan().length;$("nav").innerHTML=Object.entries(dn?{...TABS,dup:"⚠ Duplicates"}:TABS).map(([k,v])=>`<button class="${k===tab?"on":""}" onclick="go('${k}')">${v}${k==="dup"?` <span class="pill p-r">${dn}</span>`:""}${k==="col"&&pending().length?` <span class="pill p-r">${pending().length}</span>`:""}</button>`).join("")}
 function go(t){tab=t;nav();render();scrollTo(0,0)}
-function render(){if(tab==="dup"&&!dupScan().length)tab="dash";({dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,money,imp})[tab]()}
+function render(){if(tab==="dup"&&!dupScan().length)tab="dash";({dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,money,oldb,imp})[tab]()}
 const noData=()=>!Object.keys(D.vs).length&&!Object.keys(D.sv).length&&!Object.keys(D.vp).length;
 
 function dash(){
@@ -362,14 +362,15 @@ function saleNo(t){t=String(t||"").trim().toUpperCase();if(!t)return"";if(D.vs&&
 const finOf=no=>D.fin.find(f=>f.inv&&saleNo(f.inv)===no);
 function coList(){return[...new Set([...D.fin.map(f=>f.co),...D.finpay.map(p=>p.co)].filter(Boolean))]}
 function coAcc(co){const F=D.fin.filter(f=>f.co===co),P=D.finpay.filter(p=>p.co===co);
-  const recd=sum(P,p=>p.amt),done=sum(F.filter(f=>f.status==="done"),f=>f.amt),pend=F.filter(f=>f.status!=="done");
+  const recd=sum(P,p=>p.amt),done=sum(F.filter(f=>f.status==="done"&&f.via!=="direct"),f=>f.amt),pend=F.filter(f=>f.status!=="done");
   return{co,files:F.length,recd,done,bal:recd-done,pendN:pend.length,pendAmt:sum(pend,f=>f.amt),old:pend.filter(f=>diff(f.date)>15).length}}
 function finSum(){const a=coList().map(coAcc);return{pendN:sum(a,x=>x.pendN),pendAmt:sum(a,x=>x.pendAmt),bal:sum(a,x=>x.bal)}}
 function fin(){
   if(finView==="reg"){$("app").innerHTML=regView();return}
+  if(finView==="xl"&&XL){$("app").innerHTML=xlView();return}
   const cos=coList(),acc=cos.map(coAcc);
-  const L=D.fin.filter(f=>(!fco||f.co===fco)&&(fst==="all"||(fst==="done"?f.status==="done":f.status!=="done"))&&(f.cust+f.model+f.inv+f.co).toLowerCase().includes(fq.toLowerCase())).sort((a,b)=>fst==="done"?(b.doneDate||"").localeCompare(a.doneDate||""):a.date.localeCompare(b.date));
-  $("app").innerHTML=`<div class="row"><button class="btn" onclick="finForm()">+ Finance file</button><button class="btn g" onclick="payForm()">+ Money from finance company</button><button class="btn g" onclick="finView='reg';fin()">📒 Register → DMS</button></div>
+  const L=D.fin.filter(f=>(!fco||f.co===fco)&&(fst==="all"||(fst==="done"?f.status==="done":f.status!=="done"))&&(f.cust+f.model+f.inv+f.co+" "+(f.reg||"")).toLowerCase().includes(fq.toLowerCase())).sort((a,b)=>fst==="done"?(b.doneDate||"").localeCompare(a.doneDate||""):a.date.localeCompare(b.date));
+  $("app").innerHTML=`<div class="row"><button class="btn" onclick="finForm()">+ Finance file</button><button class="btn g" onclick="payForm()">+ Money from finance company</button><button class="btn g" onclick="finView='reg';fin()">📒 Register → DMS</button><label class="btn g" style="cursor:pointer">📊 Excel (चालान + Finance) डालें<input type="file" accept=".xlsx,.xls" style="display:none" onchange="xlOpen(this)"></label></div>
   <p class="muted" style="margin-top:0">Company advance/payment आए तो <b>Money from finance company</b> में डालें। Company जब किसी file का पैसा काट ले (adjust कर दे) तो उस file पर <b>Mark adjusted</b> दबाएँ।</p>
   ${acc.length?`<div class="grid">${acc.map(a=>`<div class="card stat click" onclick="fco='${esc(a.co)}';fin()" style="${fco===a.co?"border-color:var(--red)":""}"><div class="l"><b>${esc(a.co)}</b></div>
     <div class="n ${a.bal>=0?"pos":"neg"}">${rs(Math.abs(a.bal))}</div><div class="s">${a.bal>=0?"advance बचा है (हमारे पास)":"company से लेना है"}</div>
@@ -379,7 +380,7 @@ function fin(){
   <div class="row" style="margin-top:12px"><span class="seg">${[["pending","Pending files"],["done","Adjusted"],["all","All"]].map(([v,l])=>`<button class="${fst===v?"on":""}" onclick="fst='${v}';fin()">${l}</button>`).join("")}</span>
   <select onchange="fco=this.value;fin()"><option value="">All companies</option>${cos.map(c=>`<option ${c===fco?"selected":""}>${esc(c)}</option>`).join("")}</select>
   <input placeholder="Search customer / model" value="${esc(fq)}" oninput="fq=this.value;fin();refocus(this)"></div>
-  ${table(["File date","Days","Customer","Vehicle","Company","Loan amount","Status","Entered by",""],L.map(f=>[fd(f.date),f.status==="done"?"":`<span class="pill ${diff(f.date)>15?"p-r":"p-w"}">${diff(f.date)}</span>`,`<b>${esc(f.cust)}</b>${f.inv?`<div class="muted">${esc(f.inv)}</div>`:""}`,esc(f.model),esc(f.co),{n:rs(f.amt)},f.status==="done"?`<span class="pill p-ok">Adjusted ${fd(f.doneDate)}</span>`:`<button class="btn s" onclick="markFin('${f.id}')">Mark adjusted</button>`,`<span class="muted">${esc(String(f.by||"").split("@")[0])}</span>`,`<button class="btn g s" onclick="finForm('${f.id}')">Edit</button>`]),L.length)}`;
+  ${table(["File date","Days","Customer","Vehicle","Company","Loan amount","Status","Entered by",""],L.map(f=>[fd(f.date),f.status==="done"?"":`<span class="pill ${diff(f.date)>15?"p-r":"p-w"}">${diff(f.date)}</span>`,`<b>${esc(f.cust)}</b>${f.inv||f.reg?`<div class="muted">${f.reg?"चालान "+esc(f.reg)+" · ":""}${esc(f.inv||"")}</div>`:""}`,esc(f.model),esc(f.co),{n:rs(f.amt)},f.status==="done"?`<span class="pill p-ok">${f.via==="direct"?"मिला":"Adjusted"} ${f.recd?rs(f.recd):""} ${fd(f.doneDate)}</span>${f.recd&&Math.abs(f.recd-f.amt)>1?`<div class="${f.recd<f.amt?"neg":"pos"}">${f.recd<f.amt?"कम":"ज़्यादा"} ${rs(Math.abs(f.recd-f.amt))}</div>`:""}`:`<button class="btn s" onclick="markFin('${f.id}')">Mark adjusted</button>`,`<span class="muted">${esc(String(f.by||"").split("@")[0])}</span>`,`<button class="btn g s" onclick="finForm('${f.id}')">Edit</button>`]),L.length)}`;
 }
 function coInput(v){return `<datalist id="coL">${[...new Set([...coList(),...COS])].map(c=>`<option>${esc(c)}</option>`).join("")}</datalist><input id="f_co" list="coL" value="${esc(v||"")}" placeholder="e.g. Hero FinCorp">`}
 function finForm(id,inv){
@@ -411,7 +412,7 @@ function savePay(id){const v={co:$("f_co").value.trim(),kind:$("p_k").value,amt:
   if(!dupOK(D.finpay.filter(x=>x.id!==id&&nz(x.co)===nz(v.co)&&x.date===v.date&&Math.abs(N(x.amt)-v.amt)<1).map(x=>`${x.co} · ${x.kind} · ${rs(x.amt)} · ${fd(x.date)}`)))return;
   const x=id?Object.assign(D.finpay.find(e=>e.id===id),v):{id:uid(),...v};if(!id)D.finpay.push(x);save();cPut("finpay",x.id,x);dlg.close();render()}
 function ledger(co){
-  const rows=[...D.finpay.filter(p=>p.co===co).map(p=>({date:p.date,t:p.kind+(p.note?" · "+p.note:""),cr:p.amt,id:p.id,pay:1})),...D.fin.filter(f=>f.co===co&&f.status==="done").map(f=>({date:f.doneDate||f.date,t:"File adjusted · "+f.cust+" · "+f.model,dr:f.amt,id:f.id}))].sort((a,b)=>a.date.localeCompare(b.date));
+  const rows=[...D.finpay.filter(p=>p.co===co).map(p=>({date:p.date,t:p.kind+(p.note?" · "+p.note:""),cr:p.amt,id:p.id,pay:1})),...D.fin.filter(f=>f.co===co&&f.status==="done"&&f.via!=="direct").map(f=>({date:f.doneDate||f.date,t:"File adjusted · "+f.cust+" · "+f.model,dr:f.amt,id:f.id}))].sort((a,b)=>a.date.localeCompare(b.date));
   let bal=0;const out=rows.map(r=>{bal+=(r.cr||0)-(r.dr||0);return[fd(r.date),esc(r.t),{n:r.cr?`<span class="pos">${rs(r.cr)}</span>`:""},{n:r.dr?rs(r.dr):""},{n:`<b class="${bal>=0?"pos":"neg"}">${rs(bal)}</b>`},r.pay?`<button class="btn g s" onclick="payForm('${r.id}')">Edit</button>`:""]});
   const a=coAcc(co);
   open("Khata – "+co,`<p>Balance: <b class="${a.bal>=0?"pos":"neg"}">${rs(Math.abs(a.bal))}</b> ${a.bal>=0?"advance हमारे पास बचा है":"company से लेना है"} · Pending files: <b>${a.pendN}</b> (${rs(a.pendAmt)})</p>${table(["Date","Details","Received","File adjusted","Balance",""],out.reverse())}`)}
@@ -540,18 +541,146 @@ function regSave(){const L=(RG||[]).filter(r=>r.inc&&!r.skip);if(!L.length)retur
     save();cPut("fin",x.id,x);n++});
   alert(n+" finance files saved ✔");RG=null;regTxt="";regPh="";finView="";fin()}
 
+
+/* ---------- "Sales of bike" Excel: challan no. + finance + old bikes ---------- */
+let XL=null,xlF="all";
+const hk=s=>String(s||"").toLowerCase().replace(/[^a-z]/g,"");
+function amtX(v){if(typeof v==="number")return v;const s=String(v||"").replace(/\(.*?\)/g,"");if(!/\d/.test(s))return 0;try{const e=s.replace(/[^\d+\-.]/g,"");return /^[\d+\-.]+$/.test(e)?e.split(/(?=[+-])/).reduce((a,x)=>a+(parseFloat(x)||0),0):N(s)}catch(e){return N(s)}}
+function coNorm(c){c=String(c||"").trim();const k=c.toUpperCase().replace(/[^A-Z]/g,"");if(!k||/^CASH/.test(k))return"";
+  const M=[[/^(BFL|BAJAJ)/,"Bajaj Finance"],[/^(SFL|SHRI|SRIRAM|SR$)/,"Shriram Finance"],[/^(MUT|MCSL)/,"Muthoot Capital (MCSL)"],[/^CHOL/,"Chola Finance"],[/^IDFC/,"IDFC First Bank"],[/^HDB/,"HDB Financial"],[/^(HERO|HFCL)/,"Hero FinCorp"],[/^AU/,"AU Small Finance"],[/^(PNB|PUNJAB)/,"Punjab National Bank"],[/^(HGB|HARYANAGR)/,"Haryana Gramin Bank"],[/^(LT|LNT)/,"L&T Finance"]];
+  for(const [r,n] of M)if(r.test(k))return n;const hit=coList().find(x=>nz(x)===nz(c));return hit||c.replace(/\s+/g," ").replace(/\b\w+/g,w=>w[0]+w.slice(1).toLowerCase())}
+const vinN=v=>String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+function lev(a,b){if(Math.abs(a.length-b.length)>3)return 9;const d=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
+async function xlOpen(inp){const f=inp.files[0];inp.value="";if(!f)return;try{const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true});
+  const sh=wb.SheetNames.map(n=>{const a=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:"",raw:true});const hi=a.findIndex(r=>r.some(c=>hk(c)==="invoice")&&r.some(c=>hk(c)==="name"));return hi<0?null:{n,a,hi}}).filter(Boolean);
+  if(!sh.length)return alert("इस फाइल में 'Invoice' और 'NAME' वाला sheet नहीं मिला");
+  XL={file:f.name,sheets:sh,sel:sh[sh.length-1].n,rows:null};xlParse();go("fin");finView="xl";fin()}catch(e){alert("फाइल नहीं खुली: "+e.message)}}
+function xlParse(){const s=XL.sheets.find(x=>x.n===XL.sel);const H=s.a[s.hi].map(hk);const c=(...ks)=>{for(const k of ks){const i=H.indexOf(k);if(i>=0)return i}return -1};
+  const I={date:c("date"),ch:c("invoice"),name:c("name"),on:c("onlinepayment"),cash:c("cash"),pend:c("pending"),tot:c("total"),loan:c("loanamount"),recd:c("actualloanreceived"),co:c("company"),bike:c("bikepurchased","bike"),yr:c("model"),old:c("oldbike"),price:c("price"),rem:c("remarks"),vin:c("vinno","vin"),ph:c("phno","phone"),dp:c("actualdp")};
+  const g=(r,k)=>I[k]>=0?r[I[k]]:"";const fy=(XL.sel.match(/20\d\d\s*-\s*\d\d/)||[XL.sel])[0].replace(/\s/g,"");
+  const rows=s.a.slice(s.hi+1).filter(r=>String(g(r,"name")).trim()).map(r=>({fy,ch:String(g(r,"ch")).trim(),name:String(g(r,"name")).trim(),date:pDate(g(r,"date")),online:amtX(g(r,"on")),onlineT:String(g(r,"on")),cash:amtX(g(r,"cash")),cashT:String(g(r,"cash")),pend:amtX(g(r,"pend")),total:amtX(g(r,"tot")),loan:amtX(g(r,"loan")),recd:amtX(g(r,"recd")),coT:String(g(r,"co")).trim(),co:coNorm(g(r,"co")),bike:String(g(r,"bike")).trim(),yr:String(g(r,"yr")).trim(),old:String(g(r,"old")).trim(),price:amtX(g(r,"price")),rem:String(g(r,"rem")).trim(),vin:vinN(g(r,"vin")),ph:String(g(r,"ph")).trim(),dp:amtX(g(r,"dp"))}));
+  xlDates(rows);xlMatch(rows);XL.rows=rows}
+function xlDates(rows){const T=d=>d?new Date(d).getTime()/864e5:null;
+  rows.forEach(r=>{r.dRaw=r.date;const m=r.date&&r.date.match(/^(\d{4})-(\d\d)-(\d\d)$/);r.alt=m&&+m[3]<=12&&m[2]!==m[3]?`${m[1]}-${m[3]}-${m[2]}`:""});
+  const ok=i=>rows[i]&&rows[i].date&&!rows[i].alt;
+  rows.forEach((r,i)=>{if(!r.date)return;let p=i-1,n=i+1;while(p>=0&&!ok(p)&&i-p<80)p--;while(n<rows.length&&!ok(n)&&n-i<80)n++;
+    const lo=ok(p)?T(rows[p].date):null;let hi=ok(n)?T(rows[n].date):null;if(lo!=null&&hi!=null&&hi<lo-5)hi=null;if(lo==null&&hi==null)return;
+    const fit=t=>t==null?1e9:Math.max(0,(lo!=null?lo-5-t:0),(hi!=null?t-hi-5:0));
+    const a=fit(T(r.date)),b=r.alt?fit(T(r.alt)):1e9;if(b<a){r.date=r.alt;r.fixed=1}if(Math.min(a,b)>60)r.dBad=1})}
+function xlMatch(rows){const S=V(D.vs).filter(s=>s.open),byV={};S.forEach(s=>byV[s.vin]=s);
+  const dd=(a,b)=>a&&b?Math.abs((new Date(a)-new Date(b))/864e5):null;
+  const xn=r=>nz(r.name),cntX={};rows.forEach(r=>cntX[xn(r)]=(cntX[xn(r)]||0)+1);
+  let anc=rows.filter(r=>r.vin&&byV[r.vin]&&+r.ch&&nameSim(r.name,byV[r.vin].cust)>=.4).map(r=>[+r.ch,sNum(byV[r.vin].no)]);
+  const pass=()=>{const A=anc.filter(x=>x[1]!=null).sort((a,b)=>a[0]-b[0]);
+   const expS=c=>{if(!A.length||!c)return null;let lo=null,hi=null;for(const x of A){if(x[0]<=c)lo=x;else{hi=x;break}}if(lo&&hi)return lo[1]+(hi[1]-lo[1])*(c-lo[0])/Math.max(1,hi[0]-lo[0]);const x=lo||hi;return x[1]+(c-x[0])};
+   rows.forEach(r=>{r.c=[];if(r.vin&&byV[r.vin]){const ns=nameSim(r.name,byV[r.vin].cust);if(ns>=.4){r.c=[{s:byV[r.vin],sc:1,how:"VIN"}];return}r.c.push({s:byV[r.vin],sc:.5,how:"VIN, नाम अलग"})}
+    const e=expS(+r.ch);const full=S.filter(s=>nameSim(r.name,s.cust)>=.95);
+    S.forEach(s=>{const ns=nameSim(r.name,s.cust);if(ns<.45)return;const n=sNum(s.no),k=e!=null&&n!=null?Math.abs(n-e):null;
+      const d=r.dBad?null:Math.min(dd(r.date,s.date)??1e9,r.alt?dd(r.alt,s.date)??1e9:1e9,r.dRaw&&r.dRaw!==r.date?dd(r.dRaw,s.date)??1e9:1e9);
+      let vs=0;if(r.vin.length>=10){const l=lev(r.vin,s.vin);vs=l<=2?1:l<=4&&r.vin.slice(-4)===s.vin.slice(-4)?.8:r.vin.slice(-5)===s.vin.slice(-5)?.7:0}
+      if(vs>=.7&&ns>=.45){r.c.push({s,sc:.9+vs*.09,how:"VIN~"});return}
+      if(ns<.55)return;const kc=k==null?.2:k<=2?1:k<=6?.7:k<=12?.4:k<=25?.15:0,dc=d==null||d>=1e9?.2:d<1?1:d<=3?.7:d<=7?.4:d<=15?.1:0;
+      const one=ns>=.95&&full.length===1&&cntX[xn(r)]===1&&String(r.name).trim().includes(" ");
+      if(kc<.15&&dc<.4&&!one)return;r.c.push({s,sc:Math.max(ns*.45+kc*.35+dc*.2,one?.8:0),how:one&&kc<.4&&dc<.4?"नाम (अकेला)":"नाम"})});if(!r.c.length)S.map(s=>[s,nameSim(r.name,s.cust)]).filter(x=>x[1]>=.6).sort((a,b)=>b[1]-a[1]).slice(0,5).forEach(([s,n])=>r.c.push({s,sc:.3*n,how:"सिर्फ़ नाम"}));r.c.sort((a,b)=>b.sc-a.sc);r.c=r.c.slice(0,5)});
+   const used={};rows.forEach(r=>r.pick="");rows.filter(r=>r.c.length).sort((a,b)=>b.c[0].sc-a.c[0].sc).forEach(r=>{const c=r.c.find(c=>!used[c.s.no]&&c.sc>=.4);r.pick=c?c.s.no:"";if(c)used[c.s.no]=1;const o=r.c.find(x=>x!==c);r.sure=!!c&&(c.how==="VIN"||c.how==="VIN~"||(c===r.c[0]&&c.sc>=.75&&(!o||c.sc-o.sc>=.1)))})};
+  pass();anc=rows.filter(r=>r.pick&&r.sure&&+r.ch).map(r=>[+r.ch,sNum(r.pick)]);pass();
+  rows.forEach(r=>{r.inc=true;r.was=!!D.chal[xlKey(r)]||!!(r.pick&&D.chal[r.pick])})}
+function xlKey(r){return r.pick||("CH-"+r.fy+"-"+r.ch)}
+function xlView(){const R=XL.rows||[];const st=r=>!r.pick?"none":r.sure?"ok":"chk";
+  const L=R.filter(r=>xlF==="all"||st(r)===xlF||(xlF==="fin"&&r.loan));
+  const n=k=>R.filter(r=>st(r)===k).length;
+  return `<div class="row"><button class="btn g" onclick="finView='';XL=null;fin()">← Finance</button><h2 style="margin:0">📊 Excel: ${esc(XL.file)}</h2></div>
+  <div class="card"><div class="row"><label style="margin:0">Sheet</label><select style="width:auto" onchange="XL.sel=this.value;xlParse();fin()">${XL.sheets.map(s=>`<option ${s.n===XL.sel?"selected":""}>${esc(s.n)}</option>`).join("")}</select>
+  <span class="muted">${R.length} बिक्री · ${R.filter(r=>r.loan).length} finance · ${R.filter(r=>r.old).length} पुरानी गाड़ी</span></div>
+  <p class="muted" style="margin-bottom:0">Excel का <b>Invoice</b> = आपका <b>चालान नंबर</b>। हर लाइन पहले <b>चेसिस (VIN)</b> से, फिर <b>नाम + तारीख + पास वाले बिल नंबर</b> से DMS की बिक्री से जुड़ती है। Save करने पर: बिक्री पर चालान नंबर लिखा जाएगा, Loan वाली लाइन की finance file बनेगी/अपडेट होगी, और Old Bike वाली लाइन "Old bikes" में जाएगी। दोबारा डालने पर पुरानी entry ही अपडेट होती है — double नहीं होता।</p></div>
+  <div class="row"><span class="seg">${[["all","सब "+R.length],["ok","✔ पक्का "+n("ok")],["chk","? जाँचें "+n("chk")],["none","✖ नहीं मिला "+n("none")],["fin","Finance वाली"]].map(([k,l])=>`<button class="${xlF===k?"on":""}" onclick="xlF='${k}';fin()">${l}</button>`).join("")}</span></div>
+  <div class="tw"><table><tr><th>✓</th><th>चालान</th><th>तारीख</th><th>नाम (Excel)</th><th>Finance</th><th>पुरानी गाड़ी</th><th>DMS बिक्री</th><th></th></tr>
+  ${L.slice(0,700).map(r=>{const i=R.indexOf(r);return`<tr><td><input type="checkbox" style="width:auto" ${r.inc?"checked":""} onchange="XL.rows[${i}].inc=this.checked"></td><td><b>${esc(r.ch)}</b></td><td>${fd(r.date)}</td><td>${esc(r.name)}${r.was?` <span class="pill p-n">पहले डला</span>`:""}</td>
+   <td>${r.loan?`${esc(r.co||r.coT)} · ${rs(r.loan)}${r.recd?`<div class="${Math.abs(r.recd-r.loan)>1?"neg":"muted"}">मिला ${rs(r.recd)}</div>`:`<div class="neg">अभी नहीं मिला</div>`}`:`<span class="muted">${esc(r.coT||"—")}</span>`}</td>
+   <td>${r.old?`${esc(r.old)}${r.price?" · "+rs(r.price):""}`:""}</td>
+   <td><select style="max-width:330px" onchange="XL.rows[${i}].pick=this.value;XL.rows[${i}].sure=false;fin()"><option value="">— कोई नहीं —</option>${r.c.map(c=>`<option value="${esc(c.s.no)}" ${c.s.no===r.pick?"selected":""}>${esc(c.s.no.replace(/^66115/,""))} · ${fd(c.s.date)} · ${esc(c.s.cust)} · ${esc(c.s.vin.slice(-6))} (${c.how})</option>`).join("")}</select></td>
+   <td>${!r.pick?`<span class="pill p-r">नहीं मिला</span>`:r.sure?`<span class="pill p-ok">✔</span>`:`<span class="pill p-w">?</span>`}</td></tr>`}).join("")}</table></div>
+  <div class="row" style="margin-top:10px"><button class="btn" onclick="xlSave()">✓ चुनी हुई ${R.filter(r=>r.inc).length} लाइनें Save करें</button><span class="muted">"नहीं मिला" वाली लाइन भी चालान नंबर के साथ save होगी, बाद में Vehicles में दिखेगी नहीं पर Finance/Old bikes में रहेगी।</span></div>`}
+async function xlSave(){const L=(XL.rows||[]).filter(r=>r.inc);if(!L.length)return;
+  const twice=L.map(r=>r.pick).filter(Boolean).filter((p,i,a)=>a.indexOf(p)!==i);if(twice.length)return alert("एक ही DMS बिक्री दो लाइनों में चुनी गई: "+[...new Set(twice)].join(", "));
+  if(!confirm(`${L.length} लाइनें save करें?\n• चालान नंबर: ${L.length}\n• Finance files: ${L.filter(r=>r.loan&&r.co).length}\n• पुरानी गाड़ियाँ: ${L.filter(r=>r.old).length}`))return;
+  const W=[];let nf=0,uf=0,no=0;
+  L.forEach(r=>{const s=r.pick&&V(D.vs).find(x=>x.no===r.pick);const k=xlKey(r);
+    if(r.pick&&D.chal["CH-"+r.fy+"-"+r.ch]){delete D.chal["CH-"+r.fy+"-"+r.ch];W.push(["del","chal","CH-"+r.fy+"-"+r.ch])}
+    const c={key:k,no:s?s.no:"",ch:r.ch,fy:r.fy,name:r.name,date:s?s.date:r.date||"",online:r.online,onlineT:r.onlineT,cash:r.cash,cashT:r.cashT,pend:r.pend,total:r.total,dp:r.dp,ph:r.ph,bike:r.bike,rem:r.rem,src:XL.file};
+    D.chal[k]=c;W.push(["set","chal",k,c]);
+    if(r.loan&&r.co){let f=(s&&D.fin.find(x=>x.inv&&saleNo(x.inv)===s.no))||D.fin.find(x=>x.xl===r.fy+"-"+r.ch);
+      const v={xl:r.fy+"-"+r.ch,reg:r.ch,amt:r.loan,co:r.co,...(s?{inv:s.no,vin:s.vin,cust:s.cust,model:s.model,date:s.date}:{cust:r.name,date:r.date||today()})};
+      if(r.recd){v.recd=r.recd;v.status="done";v.via="direct";v.doneDate=(f&&f.doneDate)||v.date}
+      if(f){if(f.status==="done"&&!r.recd){delete v.status}Object.assign(f,v);uf++}else{f={id:"xl-"+sid(r.fy+"-"+r.ch),status:"pending",doneDate:"",note:"",...v};D.fin.push(f);nf++}
+      W.push(["set","fin",f.id,f])}
+    if(r.old){const id="xl-"+sid(r.fy+"-"+r.ch);let o=D.old.find(x=>x.id===id)||D.old.find(x=>x.reg&&nz(x.reg)===nz(r.old)&&/^HR/i.test(r.old));
+      const m=r.rem.match(/sold\s*to\s*([a-z .]*?)\s*(\d[\d,]*)?\s*$/i)||r.rem.match(/^([a-z .]+?)\s*sold/i);
+      const isReg=/^[A-Z]{2}\s*-?\d/i.test(r.old),num=/^\d+$/.test(r.old);const v={reg:isReg?r.old.toUpperCase().replace(/[\s-]/g,""):"",yr:r.yr,price:r.price||(num?+r.old:0),sale:s?s.no:"",ch:r.ch,fy:r.fy,cust:r.name,date:s?s.date:r.date||"",note:[!isReg&&!num?"Excel: "+r.old:"",r.rem].filter(Boolean).join(" · ")};
+      if(m){v.status="sold";v.soldTo=(m[1]||"").trim();if(m[2])v.soldAmt=N(m[2])}
+      if(o){Object.assign(o,v)}else{o={id,status:"stock",...v};D.old.push(o);no++}W.push(["set","old",o.id,o])}});
+  save();
+  if(FB){setSync("⏳ Saving…");try{for(let i=0;i<W.length;i+=400){const b=FB.F.writeBatch(FB.db);W.slice(i,i+400).forEach(w=>w[0]==="del"?b.delete(R_(w[1],sid(w[2]))):b.set(R_(w[1],sid(w[2])),{...w[3],by:w[3].by||ME}));await b.commit()}setSync("☁ Synced · "+ME)}catch(e){cErr(e)}}
+  alert(`Save ✔\nचालान: ${L.length}\nFinance: ${nf} नई, ${uf} अपडेट\nपुरानी गाड़ियाँ: ${no} नई`);XL=null;finView="";fin()}
+const chalOf=no=>D.chal[no];
+
+/* ---------- Old bikes (exchange) ---------- */
+let oq="",oSt="stock";
+const OLD_PHOTO=`HR54D8857
+HR02AT4442
+HR54E1333
+HR02AW2507
+HR54D1055
+HR02AV9053
+HR02AK6640
+HR07X9169
+HR02AJ8421
+HR02AS3089
+HR02AV5296
+HR02AL3698
+HR02AY0243
+HR41Z9765`;
+function oldb(){const A=D.old.filter(o=>(oSt==="all"||(o.status||"stock")===oSt)&&(o.reg+o.cust+o.ch+o.sale+o.soldTo+o.yr).toLowerCase().includes(oq.toLowerCase())).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const stk=D.old.filter(o=>(o.status||"stock")==="stock"),sold=D.old.filter(o=>o.status==="sold");
+  $("app").innerHTML=`<div class="row"><button class="btn" onclick="oldForm()">+ Old bike</button><button class="btn g" onclick="oldList()">📋 गाड़ी नंबरों की सूची डालें</button></div>
+  <div class="grid"><div class="card stat"><div class="l">स्टॉक में (बिकी नहीं)</div><div class="n">${stk.length}</div><div class="s">खरीद ${rs(sum(stk,o=>N(o.price)))}</div></div>
+  <div class="card stat"><div class="l">बिक चुकी</div><div class="n">${sold.length}</div><div class="s">बिक्री ${rs(sum(sold,o=>N(o.soldAmt)))}</div></div>
+  <div class="card stat"><div class="l">फ़ायदा / नुकसान (बिकी हुई)</div><div class="n ${sum(sold.filter(o=>o.soldAmt),o=>N(o.soldAmt)-N(o.price))>=0?"pos":"neg"}">${rs(sum(sold.filter(o=>o.soldAmt),o=>N(o.soldAmt)-N(o.price)))}</div></div></div>
+  <div class="row" style="margin-top:12px"><span class="seg">${[["stock","स्टॉक में"],["sold","बिक चुकी"],["all","सब"]].map(([v,l])=>`<button class="${oSt===v?"on":""}" onclick="oSt='${v}';oldb()">${l}</button>`).join("")}</span><input placeholder="Search गाड़ी नंबर / नाम / चालान" value="${esc(oq)}" oninput="oq=this.value;oldb();refocus(this)"></div>
+  ${table(["गाड़ी नंबर","मॉडल / साल","किस बिक्री के साथ (चालान · बिल · ग्राहक)","ली (₹)","किसको बेची","बेची (₹)","फ़ायदा","",""],A.map(o=>{const s=o.sale&&V(D.vs).find(x=>x.no===o.sale);const p=o.soldAmt&&o.price?N(o.soldAmt)-N(o.price):null;
+    return[`<b>${esc(o.reg||"—")}</b>`,esc(o.yr||""),o.ch||s||o.cust?`${o.ch?`चालान <b>${esc(o.ch)}</b>`:""}${s?` · ${esc(s.no.replace(/^66115/,""))}`:""}<div class="muted">${esc(o.cust||"")} ${fd(o.date)}</div>`:`<span class="muted">—</span>`,{n:o.price?rs(o.price):"–"},esc(o.soldTo||""),{n:o.soldAmt?rs(o.soldAmt):""},{n:p===null?"":`<span class="${p>=0?"pos":"neg"}">${rs(p)}</span>`},o.status==="sold"?`<span class="pill p-ok">बिक गई</span>`:`<span class="pill p-w">स्टॉक</span>`,`<button class="btn g s" onclick="oldForm('${o.id}')">Edit</button>`]}),A.length)}`}
+function oldForm(id){const o=D.old.find(x=>x.id===id)||{status:"stock",date:today()};
+  const ss=sales().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,400);
+  open(id?"Edit old bike":"New old bike",`<div class="form"><div><label>गाड़ी नंबर *</label><input id="o_reg" value="${esc(o.reg)}" placeholder="HR02AB1234" style="text-transform:uppercase"></div><div><label>मॉडल / साल</label><input id="o_yr" value="${esc(o.yr)}"></div>
+  <div style="grid-column:1/-1"><label>किस नई बिक्री के साथ आई</label><select id="o_sale"><option value="">— नहीं पता —</option>${ss.map(s=>`<option value="${esc(s.no)}" ${s.no===o.sale?"selected":""}>${fd(s.date)} · ${esc(s.cust)} · ${esc(s.no.replace(/^66115/,""))}${chalOf(s.no)?" · चालान "+esc(chalOf(s.no).ch):""}</option>`).join("")}</select></div>
+  <div><label>चालान नंबर</label><input id="o_ch" value="${esc(o.ch)}"></div><div><label>ग्राहक (जिससे ली)</label><input id="o_cust" value="${esc(o.cust)}"></div>
+  <div><label>कितने में ली ₹</label><input id="o_pr" type="number" value="${o.price||""}"></div><div><label>तारीख</label><input id="o_d" type="date" value="${o.date||""}"></div>
+  <div><label>Status</label><select id="o_st"><option value="stock">स्टॉक में</option><option value="sold" ${o.status==="sold"?"selected":""}>बिक गई</option></select></div>
+  <div><label>किसको बेची</label><input id="o_to" value="${esc(o.soldTo)}"></div><div><label>कितने में बेची ₹</label><input id="o_sa" type="number" value="${o.soldAmt||""}"></div>
+  <div><label>Note</label><input id="o_n" value="${esc(o.note)}"></div></div>
+  <div class="row" style="margin-top:12px"><button class="btn" onclick="oldSave('${id||""}')">Save</button>${id?`<button class="btn g" style="margin-left:auto" onclick="if(confirm('Delete?')){D.old=D.old.filter(x=>x.id!=='${id}');save();cDel('old','${id}');dlg.close();render()}">Delete</button>`:""}</div>`);
+  $("o_sale").onchange=function(){const s=V(D.vs).find(x=>x.no===this.value);if(s){if(!$("o_cust").value)$("o_cust").value=s.cust;if(!$("o_d").value)$("o_d").value=s.date;const c=chalOf(s.no);if(c&&!$("o_ch").value)$("o_ch").value=c.ch}}}
+function oldSave(id){const v={reg:$("o_reg").value.trim().toUpperCase().replace(/\s/g,""),yr:$("o_yr").value.trim(),sale:$("o_sale").value,ch:$("o_ch").value.trim(),cust:$("o_cust").value.trim(),price:N($("o_pr").value),date:$("o_d").value,status:$("o_st").value,soldTo:$("o_to").value.trim(),soldAmt:N($("o_sa").value),note:$("o_n").value.trim()};
+  if(!v.reg)return alert("गाड़ी नंबर डालें");
+  if(!dupOK(D.old.filter(x=>x.id!==id&&nz(x.reg)===nz(v.reg)).map(x=>`${x.reg} · ${x.cust||""} · ${x.status==="sold"?"बिक गई":"स्टॉक"}`)))return;
+  const x=id?Object.assign(D.old.find(e=>e.id===id),v):{id:uid(),...v};if(!id)D.old.push(x);save();cPut("old",x.id,x);dlg.close();render()}
+function oldList(){open("गाड़ी नंबरों की सूची",`<p class="muted">एक लाइन में एक गाड़ी नंबर। जो नंबर पहले से है वह दोबारा नहीं जुड़ेगा।</p><textarea id="ol_t" rows="10" style="font-family:monospace"></textarea>
+  <div class="row" style="margin-top:8px"><button class="btn g" onclick="$('ol_t').value=OLD_PHOTO">फोटो वाली सूची (14) भरें</button><button class="btn" onclick="oldListSave()">Save</button></div>`)}
+function oldListSave(){const L=$("ol_t").value.split(/\n/).map(x=>x.trim().toUpperCase().replace(/\s/g,"")).filter(x=>x.length>=5);let n=0,sk=[];
+  L.forEach(reg=>{if(D.old.some(o=>nz(o.reg)===nz(reg))){sk.push(reg);return}const o={id:uid(),reg,status:"stock",date:"",note:"सूची से"};D.old.push(o);cPut("old",o.id,o);n++});save();dlg.close();render();alert(`${n} गाड़ियाँ जुड़ीं`+(sk.length?`\nपहले से थीं (छोड़ी): ${sk.join(", ")}`:""))}
+
 /* ---------- vehicles ---------- */
 let vehView="sales",vq="";
 function veh(){
   const r=range();
-  const head=`<div class="row"><span class="seg"><button class="${vehView==="sales"?"on":""}" onclick="vehView='sales';veh()">Sales</button><button class="${vehView==="stock"?"on":""}" onclick="vehView='stock';veh()">Stock</button></span>${vehView==="sales"?perSel():""}<input placeholder="Search name / model / VIN" value="${esc(vq)}" oninput="vq=this.value;veh();refocus(this)"></div>`;
+  const head=`<div class="row"><span class="seg"><button class="${vehView==="sales"?"on":""}" onclick="vehView='sales';veh()">Sales</button><button class="${vehView==="stock"?"on":""}" onclick="vehView='stock';veh()">Stock</button></span>${vehView==="sales"?perSel():""}<input placeholder="Search name / model / VIN / चालान" value="${esc(vq)}" oninput="vq=this.value;veh();refocus(this)"></div>`;
   if(vehView==="sales"){
-    const S=sales(r).filter(s=>(s.cust+s.model+s.vin+s.no).toLowerCase().includes(vq.toLowerCase())).sort((a,b)=>b.date.localeCompare(a.date)||b.no.localeCompare(a.no));
+    const S=sales(r).filter(s=>(s.cust+s.model+s.vin+s.no+" "+(chalOf(s.no)?"ch"+chalOf(s.no).ch+" "+chalOf(s.no).ch:"")).toLowerCase().includes(vq.toLowerCase())).sort((a,b)=>b.date.localeCompare(a.date)||b.no.localeCompare(a.no));
     const wm=S.filter(s=>margin(s)!==null),mg=sum(wm,margin),low=wm.filter(s=>margin(s)<1000);
     const byM=groupSum(S,s=>s.model,()=>1);
     $("app").innerHTML=head+`<div class="grid"><div class="card stat"><div class="l">Vehicles sold</div><div class="n">${S.length}</div></div><div class="card stat"><div class="l">Sale value</div><div class="n">${lakh(sum(S,s=>s.bill))}</div></div><div class="card stat"><div class="l">Margin (ex-GST)</div><div class="n pos">${lakh(mg)}</div><div class="s">avg ${rs(wm.length?mg/wm.length:0)}</div></div><div class="card stat"><div class="l">Discount given</div><div class="n neg">${lakh(sum(S,s=>s.disc))}</div></div><div class="card stat"><div class="l">Sold below ₹1,000 margin</div><div class="n ${low.length?"neg":""}">${low.length}</div></div></div>
     <div class="g2" style="margin:12px 0"><div class="card"><h3>Models sold</h3>${bars(byM.slice(0,8),v=>v+" pcs")}</div><div class="card"><h3>Margin per vehicle by model</h3>${bars(groupSum(wm,s=>s.model,margin).map(([k,v])=>[k,v/wm.filter(s=>s.model===k).length]).sort((a,b)=>b[1]-a[1]).slice(0,8),rs,"var(--green)")}</div></div>
-    ${table(["Date","Invoice","Customer","Model","VIN","Sale (with GST)","Discount","Purchase cost","Margin ex-GST","Finance"],S.slice(0,400).map(s=>{const p=vpOf(s.vin),m=margin(s),fl=finOf(s.no);return[fd(s.date),esc(s.no),esc(s.cust),esc(s.model),`<span class="muted">${esc(s.vin)}</span>`,{n:rs(s.bill)},{n:s.disc?rs(s.disc):""},{n:p?rs(p.cost):"–"},{n:m===null?"–":`<span class="${m<1000?"neg":"pos"}">${rs(m)}</span>`},fl?`<span class="pill ${fl.status==="done"?"p-ok":"p-w"}" style="cursor:pointer" onclick="finForm('${fl.id}')">${esc(fl.co)} ${fl.status==="done"?"✓":"pending"}</span>`:`<button class="btn g s" onclick="finForm(null,'${esc(s.no)}')">+ Finance</button>`]}),S.length)}`;
+    ${table(["Date","Invoice","चालान","Customer","Model","VIN","Sale (with GST)","Discount","Purchase cost","Margin ex-GST","Finance"],S.slice(0,400).map(s=>{const p=vpOf(s.vin),m=margin(s),fl=finOf(s.no);const cx=chalOf(s.no);return[fd(s.date),esc(s.no),cx?`<b>${esc(cx.ch)}</b>${cx.pend?`<div class="neg">बाकी ${rs(cx.pend)}</div>`:""}`:"",esc(s.cust),esc(s.model),`<span class="muted">${esc(s.vin)}</span>`,{n:rs(s.bill)},{n:s.disc?rs(s.disc):""},{n:p?rs(p.cost):"–"},{n:m===null?"–":`<span class="${m<1000?"neg":"pos"}">${rs(m)}</span>`},fl?`<span class="pill ${fl.status==="done"?"p-ok":"p-w"}" style="cursor:pointer" onclick="finForm('${fl.id}')">${esc(fl.co)} ${fl.status==="done"?"✓":"pending"}</span>`:`<button class="btn g s" onclick="finForm(null,'${esc(s.no)}')">+ Finance</button>`]}),S.length)}`;
   }else{
     const all=stockVehicles().filter(p=>(p.model+p.vin+p.desc).toLowerCase().includes(vq.toLowerCase())).sort((a,b)=>b.age-a.age);
     const st=all.filter(x=>!x.old),old=all.filter(x=>x.old);
@@ -797,7 +926,7 @@ async function start(){
   startOwner()}
 function startOwner(){
   screen(`<div class="empty">⏳ Loading data…</div>`);setSync("⏳");
-  const {F}=FB;let ready={m:0,e:0,c:0,f:0,p:0,a:0,k:0};const go1=()=>{if(ready.m&&ready.e&&ready.c&&ready.f&&ready.p&&ready.a&&ready.k){setSync("☁ Synced · "+ME);save();nav();render()}};
+  const {F}=FB;let ready={m:0,e:0,c:0,f:0,p:0,a:0,k:0,h:0,o:0};const go1=()=>{if(ready.m&&ready.e&&ready.c&&ready.f&&ready.p&&ready.a&&ready.k&&ready.h&&ready.o){setSync("☁ Synced · "+ME);save();nav();render()}};
   UNSUB.push(F.onSnapshot(R_("meta","info"),async snap=>{
     const m=snap.exists()?snap.data():null;
     if(!m){if(!ready.m){ready.m=1;go1();if(!noData()){setSync("⏳ Uploading this device's data…");try{await pushDMS(DMSK);D.exp.forEach(e=>cPut("exp",e.id,e));Object.entries(D.coll).forEach(([no,v])=>cPut("coll",no,{...v,no}));setSync("☁ Synced · "+ME)}catch(e){cErr(e)}}}return}
@@ -807,6 +936,8 @@ function startOwner(){
     if(!ready.m){ready.m=1;go1()}else{save();refresh()}
   },cErr));
   UNSUB.push(F.onSnapshot(C_("dupok"),snap=>{const o={};snap.docs.forEach(d=>{o[d.data().key]=1});D.dupok=o;if(!ready.k){ready.k=1;go1()}else refresh()},cErr));
+  UNSUB.push(F.onSnapshot(C_("chal"),snap=>{const o={};snap.docs.forEach(d=>{const x=d.data();o[x.key]=x});D.chal=o;if(!ready.h){ready.h=1;go1()}else refresh()},cErr));
+  UNSUB.push(F.onSnapshot(C_("old"),snap=>{D.old=snap.docs.map(d=>d.data());if(!ready.o){ready.o=1;go1()}else refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("areg"),snap=>{D.areg=snap.docs.map(d=>d.data());if(!ready.a){ready.a=1;go1()}else refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("fin"),snap=>{D.fin=snap.docs.map(d=>d.data());if(!ready.f){ready.f=1;go1()}else refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("finpay"),snap=>{D.finpay=snap.docs.map(d=>d.data());if(!ready.p){ready.p=1;go1()}else refresh()},cErr));
@@ -837,7 +968,7 @@ function saveColl(no){const v={no,date:$("m_d").value,amt:N($("m_a").value),mode
 function undoColl(no){delete D.coll[no];save();cDel("coll",no);nav();render()}
 function delExp(id){if(!confirm("Delete this entry?"))return;D.exp=D.exp.filter(e=>e.id!==id);save();cDel("exp",id);dlg.close();render()}
 async function clearDMS(){if(!confirm("Delete all DMS data for everyone? Expense entries and marked receipts stay."))return;const k=D.exp,c=D.coll;D=EMPTY();D.exp=k;D.coll=c;save();await pushDMS(DMSK);imp()}
-async function restoreAll(x){D=Object.assign(EMPTY(),x);save();screen(`<div class="empty">⏳ Uploading backup…</div>`);await pushDMS(DMSK);for(const e of D.exp)cPut("exp",e.id,e);for(const e of D.fin)cPut("fin",e.id,e);for(const e of D.areg)cPut("areg",e.id,e);for(const e of D.finpay)cPut("finpay",e.id,e);for(const [no,v] of Object.entries(D.coll))cPut("coll",no,{...v,no});nav();render()}
+async function restoreAll(x){D=Object.assign(EMPTY(),x);save();screen(`<div class="empty">⏳ Uploading backup…</div>`);await pushDMS(DMSK);for(const e of D.exp)cPut("exp",e.id,e);for(const e of D.fin)cPut("fin",e.id,e);for(const e of D.areg)cPut("areg",e.id,e);for(const e of D.finpay)cPut("finpay",e.id,e);for(const e of D.old)cPut("old",e.id,e);for(const [k,v] of Object.entries(D.chal))cPut("chal",k,{...v,key:k});for(const [no,v] of Object.entries(D.coll))cPut("coll",no,{...v,no});nav();render()}
 
 /* ---------- helpers ---------- */
 function open(t,html){$("dlgT").textContent=t;$("dlgB").innerHTML=html;if(!dlg.open)dlg.showModal()}
