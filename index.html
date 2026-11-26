@@ -842,7 +842,7 @@ function saveExp(type,id){const v={type,date:$("e_date").value,head:$("e_head").
   if(!dupOK(D.exp.filter(e=>e.id!==id&&e.type===v.type&&e.date===v.date&&Math.abs(N(e.amt)-v.amt)<1&&nz(e.head)===nz(v.head)).map(e=>`${fd(e.date)} · ${e.head} · ${rs(e.amt)} · ${e.note||""}`)))return;const x=id?Object.assign(D.exp.find(e=>e.id===id),v):{id:uid(),...v};if(!id)D.exp.push(x);save();cPut("exp",x.id,x);dlg.close();render()}
 
 /* ---------- Day Book (रोजनामचा = vehicle sale register photo → चालान / DMS sale / finance / old bike + other income & expenses, with double check) ---------- */
-let DB=null,DBT=[],DBD=[],dbPh="",dbq="";
+let DB=null,DBT=[],DBD=[],DBB=null,dbPh="",dbq="";
 const DB_HEADS=[[/salar|tankh|तनख|pagar|वेतन/i,"Salary"],[/rent|kiray|किराय/i,"Rent"],[/bijli|बिजली|electric|light bill/i,"Electricity"],[/chai|चाय|tea|nashta|नाश्त|misc/i,"Tea / misc"],[/bhada|भाड़|freight|transport|tempo|cartage/i,"Transport / freight"],[/hmcl|hero moto|distribut|vehicle pay/i,"Distributor payment (vehicles)"],[/parts?\b|spare|lubricant|oil/i,"Parts supplier payment"],[/bank ch|emi|interest|ब्याज/i,"Bank charges / EMI"],[/rto|registration/i,"RTO / insurance paid"],[/withdraw|drawing|ghar|घर/i,"Partner withdrawal"]];
 const INS_RE=/insur|ins\.? ?renew|national ins|united india|new india|oriental|iffco|icici lomb|hdfc ergo|tata aig|go ?digit|bajaj (general|allianz)/i;
 function dbCo(t){const n=nz(t);const hit=coList().find(c=>nz(c).length>3&&n.includes(nz(c)));if(hit)return hit;
@@ -880,7 +880,7 @@ function dbCands(r){const C=[],eq=dbEq,near=(d,k)=>dbDd(r.date,d)<=k,txt=r.name+
 const dbCur=r=>r.c.find(c=>c.key===r.pk)||r.c[0];
 
 /* vehicle sale lines: folio = चालान no. → DMS sale; finance file; old bike; doubles */
-function dbSale(r){r.fy=fyOf(r.date);r.ch=chalByFolio(r.folio,r.fy);r.warn=[];r.info=[];r.dupT="";r.fin=null;r.old=null;
+function dbSale(r){r.fy=fyOf(r.date);r.ch=chalByFolio(r.folio,r.fy);r.warn=[];r.info=[];r.dupT="";r.prevT="";r.prevDiff=[];r.fin=null;r.old=null;
   const C=[],seen={},add=(s,sc,how)=>{if(seen[s.no])return;seen[s.no]=1;C.push({s,sc,how})};
   if(r.ch&&r.ch.no){const s=V(D.vs).find(x=>x.no===r.ch.no&&x.open);if(s)add(s,nameSim(r.name,s.cust)>=.5?1:.55,`चालान ${r.ch.ch}`)}
   sales().forEach(s=>{const ns=nameSim(r.name,s.cust);if(ns<.55)return;const d=dbDd(r.date,s.date);if(d>20)return;
@@ -892,7 +892,17 @@ function dbSale(r){r.fy=fyOf(r.date);r.ch=chalByFolio(r.folio,r.fy);r.warn=[];r.
   if(r.ch&&!r.ch.no&&r.ch.name&&nameSim(r.ch.name,r.name)<.5)r.warn.push(`चालान ${r.ch.ch} पर Excel में नाम "${r.ch.name}" है`);
   if(s&&!r.ch&&chalOf(s.no)&&r.folio&&String(chalOf(s.no).ch)!==String(r.folio))r.warn.push(`इस बिक्री पर पहले से चालान ${chalOf(s.no).ch} लगा है, Day Book में ${r.folio}`);
   const d=D.dbk.find(x=>x.kind==="sale"&&dbEq(x.amt,r.amt)&&dbEq(x.online||0,r.online||0)&&dbEq(x.finAmt,r.finAmt)&&x.date===r.date&&(r.folio&&x.folio?String(x.folio)===String(r.folio):nameSim(x.name,r.name)>=.6));
-  if(d)r.dupT=`Day Book में पहले से डली: ${fd(d.date)} · ${d.folio?"चालान "+d.folio+" · ":""}${d.name} · ${rs(d.amt)}`;
+  if(d)r.dupT=`Day Book में पहले से डली: ${fd(d.date)} · ${d.folio?"चालान "+d.folio+" · ":""}${d.name} · ${rs(d.amt)} — कोई अंतर नहीं`;
+  const prevs=D.dbk.filter(x=>x.kind==="sale"&&x!==d&&((r.folio&&x.folio&&String(x.folio)===String(r.folio)&&fyOf(x.date)===r.fy)||(r.pick&&x.no&&x.no===r.pick))).sort((a,b)=>(a.at||0)-(b.at||0));
+  if(prevs.length&&!d){const p=prevs[prevs.length-1],df=[],cmp=(l,a,b)=>{if(!dbEq(a,b))df.push(`${l}: पहले ${rs(a)} → अब ${rs(b)}`)};
+    if(p.date!==r.date)df.push(`तारीख: पहले ${fd(p.date)} → अब ${fd(r.date)}`);
+    if(nameSim(p.name,r.name)<.6)df.push(`नाम: पहले ${p.name} → अब ${r.name}`);
+    if(String(p.folio||"")!==String(r.folio||""))df.push(`चालान: पहले ${p.folio||"—"} → अब ${r.folio||"—"}`);
+    cmp("Cash",N(p.amt),N(r.amt));cmp("Account",N(p.online),N(r.online));
+    if(!dbEq(p.finAmt,r.finAmt)||(p.co&&r.co&&nz(p.co)!==nz(r.co)))df.push(`Finance: पहले ${p.co||"—"} ${rs(N(p.finAmt))} → अब ${r.co||"—"} ${rs(N(r.finAmt))}`);
+    if(!dbEq(p.oldPrice,r.oldPrice)||nz(p.oldReg||"")!==nz(r.oldReg||""))df.push(`पुरानी गाड़ी: पहले ${p.oldReg||"—"} ${rs(N(p.oldPrice))} → अब ${r.oldReg||"—"} ${rs(N(r.oldPrice))}`);
+    const pt=N(p.amt)+N(p.online)+N(p.finAmt)+N(p.oldPrice);if(!dbEq(pt,dbTot(r)))df.push(`गाड़ी कुल: पहले ${rs(pt)} → अब ${rs(dbTot(r))}`);
+    r.prevT=`यह गाड़ी पहले Day Book में save है — ${fd(p.date)}${p.folio?" · चालान "+p.folio:""} · ${p.name}${prevs.length>1?` (कुल ${prevs.length} बार)`:""}`;r.prevDiff=df}
   const ex=r.ch||(s&&chalOf(s.no));
   if(r.online&&dbEq(r.online,r.amt))r.warn.push("Cash और Online में एक ही रकम है — दो बार तो नहीं चढ़ रही? ज़रूरत न हो तो Online खाली करें");
   if(ex&&((r.amt&&(dbEq(ex.cash,r.amt)||dbEq(ex.dp,r.amt)))||(r.online&&dbEq(ex.online,r.online))))r.info.push(`Excel में इस चालान पर cash ${rs(ex.cash)} · online ${rs(ex.online)} लिखा है`);
@@ -912,10 +922,10 @@ function dbOldSale(r){r.fy=fyOf(r.date);r.warn=[];r.info=[];r.dupT="";r.cands=[]
   if(d)r.dupT=`Day Book में पहले से डली: ${fd(d.date)} · पुरानी गाड़ी ${d.oldReg||""} बिकी ${rs(N(d.amt)+N(d.online))}`;
   else if(r.old&&r.old.status==="sold"){if(dbEq(r.old.soldAmt,sold))r.dupT=`Old bikes में यह गाड़ी पहले से ${rs(r.old.soldAmt)} में बिकी दर्ज है`;else r.warn.push(`Old bikes में यह गाड़ी पहले से "बिक गई" है${r.old.soldAmt?" ("+rs(r.old.soldAmt)+")":""} — save करने पर नई रकम लिखी जाएगी`)}}
 function dbBuild(){
-  DB.forEach(r=>{if(r.kind==="sale"){dbSale(r);if(!r.manualInc)r.inc=!r.dupT&&dbHas(r)}
+  DB.forEach(r=>{if(r.saved)return;if(r.kind==="sale"){dbSale(r);if(!r.manualInc)r.inc=!r.dupT&&!r.prevT&&dbHas(r)}
     else if(r.kind==="oldsale"){dbOldSale(r);if(!r.manualInc)r.inc=!r.dupT&&dbHas(r)}
     else{r.type=r.kind==="expense"?"out":"in";r.c=dbCands(r);if(!r.manualPk||!r.c.some(c=>c.key===r.pk)){const c=r.c[0];r.pk=c.key;r.manualPk=false;if(!r.manualInc)r.inc=c.k!=="dup"&&c.k!=="skip"}}});
-  DB.forEach((r,j)=>{const i=DB.findIndex((x,k)=>k<j&&x.kind===r.kind&&r.amt&&dbEq(x.amt,r.amt)&&x.date===r.date&&(r.kind==="sale"&&r.folio?String(x.folio)===String(r.folio):(nameSim(x.name,r.name)>=.6||nz(x.name)===nz(r.name))));
+  DB.forEach((r,j)=>{if(r.saved)return;const i=DB.findIndex((x,k)=>k<j&&x.kind===r.kind&&r.amt&&dbEq(x.amt,r.amt)&&x.date===r.date&&(r.kind==="sale"&&r.folio?String(x.folio)===String(r.folio):(nameSim(x.name,r.name)>=.6||nz(x.name)===nz(r.name))));
     if(i<0)return;const t=`इसी पेज में दो बार (लाइन ${i+1} जैसी)`;
     if(!dbIsMoney(r)){r.dupT=t;if(!r.manualInc)r.inc=false}else{const c={k:"dup",sc:1,t,key:"dup|batch"};r.c.unshift(c);if(!r.manualPk){r.pk=c.key;if(!r.manualInc)r.inc=false}}})}
 
@@ -964,19 +974,19 @@ function dbBuyHtml(s,t){const p=dbBuy(s);if(!s)return"";if(!p)return`<br><span c
   return`<br>DMS खरीद <b>${rs(p.cost)}</b> <span class="muted">(${fd(p.date)}${p.inv?" · "+esc(p.inv):""})</span><br>बचत <b class="${m>=0?"pos":"neg"}">${rs(m)}</b> <span class="muted">(गाड़ी कुल − खरीद, GST सहित)</span>`}
 const dbIsMoney=r=>r.kind==="income"||r.kind==="expense";
 const dbHas=r=>r.kind==="oldsale"?!!(r.amt||r.online):r.kind==="sale"?!!(r.amt||r.online||r.finAmt||r.oldReg||r.oldPrice):!!r.amt;
-const dbOk=r=>r.inc&&dbHas(r)&&(!dbIsMoney(r)?!r.dupT:!["dup","skip"].includes(dbCur(r).k));
+const dbOk=r=>!r.saved&&r.inc&&dbHas(r)&&(!dbIsMoney(r)?!r.dupT:!["dup","skip"].includes(dbCur(r).k));
 function dbStatus(r){if(r.kind==="oldsale")return r.dupT?`<span class="pill p-r">⚠ Double</span>`:r.old||r.oldNew?`<span class="pill p-ok">✔ गाड़ी मिली</span>`:`<span class="pill p-w">नई बनेगी</span>`;
-  if(r.kind==="sale")return r.dupT?`<span class="pill p-r">⚠ Double</span>`:!r.pick?`<span class="pill p-w">DMS में नहीं मिली</span>`:r.sure?`<span class="pill p-ok">✔ मिली</span>`:`<span class="pill p-w">? जाँचें</span>`;
+  if(r.kind==="sale")return r.dupT?`<span class="pill p-r">⚠ Double</span>`:r.prevT?`<span class="pill p-w">⚠ पहले save है</span>`:!r.pick?`<span class="pill p-w">DMS में नहीं मिली</span>`:r.sure?`<span class="pill p-ok">✔ मिली</span>`:`<span class="pill p-w">? जाँचें</span>`;
   const c=dbCur(r);return c.k==="dup"?`<span class="pill p-r">⚠ Double</span>`:c.k==="skip"?`<span class="pill p-n">छोड़ा</span>`:c.k==="exp"?`<span class="pill p-b">नई</span>`:c.sc>=.8?`<span class="pill p-ok">✔ मिला</span>`:`<span class="pill p-w">? जाँचें</span>`}
 
 /* save */
-async function dbSave(go){const L=DB.filter(dbOk);if(!L.length)return alert("Save करने के लिए कोई लाइन चुनी नहीं");
+async function dbSave(go,only){const L=only?[only]:DB.filter(dbOk);if(!L.length)return alert("Save करने के लिए कोई लाइन चुनी नहीं");
   if(L.some(r=>!r.date))return alert("कुछ लाइनों में तारीख खाली है");
   const keys=L.filter(dbIsMoney).map(dbCur).filter(c=>!["exp","finpay"].includes(c.k)).map(c=>c.key),twice=keys.filter((k,i)=>keys.indexOf(k)!==i);
   if(twice.length)return alert("एक ही entry (bill / file / job) दो लाइनों पर लगाई गई है – एक बदलें:\n"+[...new Set(twice)].map(k=>L.filter(dbIsMoney).map(dbCur).find(c=>c.key===k).t).join("\n"));
-  if(!go)return dbReview();dlg.close();
-  const W=[],cnt={},batch=uid(),at=Date.now();L.sort((a,b)=>(a.kind==="oldsale")-(b.kind==="oldsale"));
-  L.forEach(r=>{const id=uid(),made=[];let ref="",prev=null;
+  if(!go&&!only)return dbReview();dlg.close();
+  const W=[],cnt={},batch=DBB||(DBB=uid()),at=Date.now();L.sort((a,b)=>(a.kind==="oldsale")-(b.kind==="oldsale"));
+  L.forEach(r=>{const id=uid(),made=[];let ref="",prev=null;r.savedId=id;
     if(r.kind==="sale"){const s=r.s,key=s?s.no:r.folio?"CH-"+r.fy+"-"+r.folio:"";cnt.sale=(cnt.sale||0)+1;
       if(key){let ch=D.chal[key];
         if(!ch&&r.ch&&!r.ch.no&&r.ch.key!==key){ch=r.ch;delete D.chal[r.ch.key];W.push(["del","chal",r.ch.key])}
@@ -1004,10 +1014,18 @@ async function dbSave(go){const L=DB.filter(dbOk);if(!L.length)return alert("Sav
   save();
   await dbCommit(W);
   const nm={sale:"बिक्री (चालान पर चढ़ी)",oldsale:"पुरानी गाड़ी बिकी",fin:"नई finance file",old:"नई पुरानी गाड़ी",exp:"नई expense / income",finpay:"Finance khata",areg:"Accident job",coll:"Credit bill"};
-  alert("Save ✔\n"+Object.entries(cnt).map(([k,v])=>`${nm[k]||k}: ${v}`).join("\n")+`\nDouble / छोड़ी: ${DB.length-L.length}`);DB=null;DBT=[];DBD=[];dbPh="";nav();dbk()}
+  if(only){only.saved=true;only.savedRef=only.kind==="sale"?(only.s?"बिक्री "+only.s.no.replace(/^66115/,""):"चालान "+(only.folio||"")):"";dbPh=`✔ Save हो गई: ${only.folio?"चालान "+esc(only.folio)+" · ":""}${esc(only.name)}`;dbBuild();nav();dbk();return}
+  alert("Save ✔\n"+Object.entries(cnt).map(([k,v])=>`${nm[k]||k}: ${v}`).join("\n")+`\nDouble / छोड़ी: ${DB.length-L.length}`);DB=null;DBT=[];DBD=[];DBB=null;dbPh="";nav();dbk()}
+function dbRowOk(r){return!r.saved&&dbHas(r)&&(dbIsMoney(r)?!["dup","skip"].includes(dbCur(r).k):!r.dupT)}
+async function dbSaveRow(i){const r=DB[i];if(!r||!dbRowOk(r))return;if(!r.date)return alert("तारीख खाली है");
+  if(r.kind==="oldsale"&&r.oldNew&&!r.oldNew.saved)return alert(`पहले चालान ${r.oldNew.folio} की बिक्री वाली लाइन (जिसमें यह पुरानी गाड़ी ली गई) save करें, फिर यह।`);
+  r.inc=true;await dbSave(1,r)}
+async function dbUnsave(i){const r=DB[i],x=D.dbk.find(e=>e.id===r.savedId);
+  if(x){const t=dbMadeTxt([x]);if(!confirm(`यह लाइन की Save वापस लें?${x.chKey?"\n• चालान पर चढ़ी रकम हटेगी":""}${t?"\n"+t:""}`))return;const W=[];dbUndoRec(x,W);save();await dbCommit(W)}
+  r.saved=false;r.savedId=null;r.manualInc=false;dbPh="";dbBuild();nav();dbk()}
 async function dbCommit(W){if(!FB||!W.length)return;setSync("⏳ Saving…");try{for(let i=0;i<W.length;i+=400){const b=FB.F.writeBatch(FB.db);W.slice(i,i+400).forEach(([op,c,id,o])=>op==="del"?b.delete(R_(c,sid(id))):b.set(R_(c,sid(id)),{...o,by:o.by||ME}));await b.commit()}setSync("☁ Synced · "+ME)}catch(e){cErr(e)}}
 const DB_MADE={fin:"Finance file",old:"पुरानी गाड़ी",exp:"Money & Expenses entry",finpay:"Finance khata entry",chal:"चालान record"};
-function dbReview(){const L=DB.filter(dbOk),S=L.filter(r=>r.kind==="sale"),M=L.filter(dbIsMoney),O=L.filter(r=>r.kind==="oldsale"),X=DB.filter(r=>!dbOk(r));
+function dbReview(){const L=DB.filter(dbOk),S=L.filter(r=>r.kind==="sale"),M=L.filter(dbIsMoney),O=L.filter(r=>r.kind==="oldsale"),X=DB.filter(r=>!r.saved&&!dbOk(r));
   const li=a=>a.length?`<ul style="margin:4px 0 12px;padding-left:20px">${a.map(t=>`<li style="margin:2px 0">${t}</li>`).join("")}</ul>`:`<div class="muted" style="margin:2px 0 12px">— कुछ नहीं</div>`;
   const nm=r=>`${r.folio?"चालान <b>"+esc(r.folio)+"</b> · ":""}${esc(r.name)}`,hd=(t,c)=>`<h3 style="margin:0;${c?"color:"+c:""}">${t}</h3>`;
   const newF=S.filter(r=>r.finAmt&&r.co&&!r.fin),oldF=S.filter(r=>r.finAmt&&r.fin),newO=S.filter(r=>(r.oldReg||r.oldPrice)&&!r.old),oldO=S.filter(r=>(r.oldReg||r.oldPrice)&&r.old),info=S.filter(r=>r.info.some(t=>/Excel में|DMS receipt/.test(t)));
@@ -1020,6 +1038,7 @@ function dbReview(){const L=DB.filter(dbOk),S=L.filter(r=>r.kind==="sale"),M=L.f
   ${O.length?hd(`🏍 पुरानी गाड़ी बिकी (${O.length})`)+li(O.map(r=>`${nm(r)} · ${esc(r.oldReg||(r.oldNew&&r.oldNew.oldReg)||(r.old&&r.old.reg)||"")} · cash ${rs(r.amt)}${r.online?" + account "+rs(r.online):""} = ${rs(N(r.amt)+N(r.online))} → ${r.old||r.oldNew?"Old bikes में \"बिक गई\"":"Old bikes में नई entry (बिकी)"}${r.info.length?" · "+esc(r.info[0]):""}`)):""}
   ${hd(`✚ आमदनी / खर्च (${M.length})`)}${li(M.map(r=>`${esc(r.name)} · ${r.kind==="expense"?"खर्च":"आमदनी"} ${rs(r.amt)} → ${esc(dbCur(r).t)}`))}
   ${info.length?hd(`ℹ Excel / DMS में भी लिखा है (${info.length}) — यह double नहीं, सिर्फ़ जानकारी`,"var(--blue)")+li(info.map(r=>`${nm(r)} · ${esc(r.info.filter(t=>/Excel में|DMS receipt/.test(t)).join(" · "))}`)):""}
+  ${(()=>{const P=DB.filter(r=>!r.saved&&r.prevT);return P.length?hd(`⚠ पहले save हो चुकी गाड़ियाँ (${P.length}) — ${P.filter(dbOk).length} फिर भी save होंगी`,"var(--amber)")+li(P.map(r=>`${nm(r)} · ${esc(r.prevT)}${r.prevDiff.length?"<br><b>अंतर:</b> "+r.prevDiff.map(esc).join(" · "):"<br>कोई अंतर नहीं"}${dbOk(r)?" <span class='neg'>(✓ लगा है — save होगी)</span>":" <span class='muted'>(✓ नहीं — save नहीं होगी)</span>"}`)):""})()}
   ${hd(`⚠ Save नहीं होंगी — Double या ✓ हटाया (${X.length})`,"var(--red)")}${li(X.map(r=>`${nm(r)} · ${rs(r.amt)} — ${esc(!dbIsMoney(r)?(r.dupT||"✓ हटाया"):(dbCur(r).k==="dup"||dbCur(r).k==="skip"?dbCur(r).t:"✓ हटाया"))}`))}
   <div class="note" style="margin-bottom:12px">Save के बाद भी Day Book टैब में हर लाइन पर <b>Delete</b> और पूरी Save पर <b>↶ Undo</b> है — उससे बनी finance file, पुरानी गाड़ी, expense भी साथ में हट जाएँगे।</div>
   <div class="row"><button class="btn" onclick="dbSave(1)">✓ ठीक है, ${L.length} entries Save करें</button><button class="btn g" onclick="dlg.close()">← वापस जाँचें</button></div>`)}
@@ -1039,7 +1058,7 @@ async function dbUndoBatch(b){const L=D.dbk.filter(x=>x.batch===b);if(!L.length)
 
 /* view */
 function dbk(){
-  const top=`<div class="row"><label class="btn" style="cursor:pointer">📷 Day Book पेज की फोटो<input type="file" accept="image/*" multiple style="display:none" onchange="dbPhoto(this.files);this.value=''"></label><button class="btn g" onclick="dbAdd()">+ हाथ से लाइन</button>${DB?`<button class="btn g" onclick="if(confirm('पढ़ी हुई लाइनें हटा दें?')){DB=null;DBT=[];DBD=[];dbPh='';dbk()}">✕ Cancel</button>`:""}</div>${aiSetBox()}
+  const top=`<div class="row"><label class="btn" style="cursor:pointer">📷 Day Book पेज की फोटो<input type="file" accept="image/*" multiple style="display:none" onchange="dbPhoto(this.files);this.value=''"></label><button class="btn g" onclick="dbAdd()">+ हाथ से लाइन</button>${DB?`<button class="btn g" onclick="if(confirm('पढ़ी हुई लाइनें हटा दें?')){DB=null;DBT=[];DBD=[];DBB=null;dbPh='';dbk()}">✕ Cancel</button>`:""}</div>${aiSetBox()}
   <div id="db_ph" style="margin-bottom:8px">${dbPh}</div>`;
   if(DB&&DB.length){
     const pgs=[...new Set(DB.map(r=>r.pg).filter(Boolean))];
@@ -1048,15 +1067,17 @@ function dbk(){
       return`<div style="margin:6px 0">पेज ${esc(p)}${R[0]?` (${fd(R[0].date)})`:""}: cash का जोड़ <b>${rs(calc)}</b> · पेज पर लिखा ${T.length?T.map(t=>`<b>${rs(t.amt)}</b>`).join(", "):"—"} ${T.length?(ok?`<span class="pill p-ok">✔ जोड़ मिला</span>`:`<span class="pill p-r">फ़र्क ${rs(Math.min(...T.map(t=>Math.abs(t.amt-calc))))} – जाँचें</span>`):""}${on?`<div class="muted" style="font-size:13px">Account / online में आया (cash के जोड़ से अलग): ${OL.map(r=>`${r.folio?"चालान "+esc(r.folio)+" ":""}${esc(r.name)} ${rs(r.online)}`).join(" + ")}${OL.length>1?` = ${rs(on)}`:""}</div>`:""}
       ${OSL.length?`<div class="muted" style="font-size:13px">पुरानी गाड़ी बिकी (cash के जोड़ से अलग): ${OSL.map(r=>`${esc(r.oldReg||r.name)} ${rs(N(r.amt)+N(r.online))} (cash ${rs(r.amt)}${r.online?" + account "+rs(r.online):""})`).join(" + ")}</div>`:""}
       ${Dp.length?`<div class="muted" style="font-size:13px">शाम को cash का हिसाब: ${[...Bk.map(t=>`${esc(t.label)} बैंक में जमा ${rs(t.amt)}`),...Ow.map(t=>`दीपांशु को cash ${rs(t.amt)}`)].join(" + ")}${Dp.length>1?` = ${rs(sum(Dp,t=>t.amt))}`:""} ${dbEq(sum(Dp,t=>t.amt),calc)?"✔ cash के जोड़ से मिला":`<span class="neg">cash के जोड़ से ${rs(Math.abs(sum(Dp,t=>t.amt)-calc))} का फ़र्क</span>`} <i>(इसकी entry नहीं बनती)</i></div>`:""}</div>`}).join("");
-    const n=f=>DB.filter(f).length;
+    const n=f=>DB.filter(r=>!r.saved&&f(r)).length,nSaved=DB.filter(r=>r.saved).length;
     $("app").innerHTML=top+`<div class="note" style="margin-bottom:10px"><b>बिक्री</b> वाली लाइन folio (= चालान नंबर) और नाम से DMS की बिक्री से जुड़ती है: उस दिन मिली रकम चालान पर चढ़ती है, finance की नई file बनती है, और पुरानी गाड़ी Old bikes में जाती है। <b>आमदनी / खर्च</b> वाली लाइन Money & Expenses में या सही khata / bill / accident job में जाती है। जो पहले से डली है उसे <b>Double</b> दिखाया जाता है और वह save नहीं होती।</div>
     ${pgChk?`<div class="card" style="margin-bottom:10px"><h3 style="margin-bottom:4px">पेज का जोड़</h3>${pgChk}<div class="muted">Amount column = cash · बाईं तरफ़ लिखी रकम = finance, या Account (ACC / A/C) / online · नीचे PNB = शाम को बैंक में जमा · गोले वाली signed रकम = दीपांशु को दिया cash।</div></div>`:""}
-    <div class="row"><span class="pill p-ok">${n(r=>r.kind==="sale"&&r.pick&&!r.dupT)} बिक्री मिली</span><span class="pill p-w">${n(r=>r.kind==="sale"&&!r.pick&&!r.dupT)} बिक्री DMS में नहीं मिली</span><span class="pill p-b">${n(dbIsMoney)} आमदनी / खर्च</span>${n(r=>r.kind==="oldsale")?`<span class="pill p-b">${n(r=>r.kind==="oldsale")} पुरानी गाड़ी बिकी</span>`:""}<span class="pill p-r">${n(r=>dbIsMoney(r)?dbCur(r).k==="dup":!!r.dupT)} Double</span><span class="pill p-n">गाड़ियाँ कुल (DP + finance + पुरानी) ${rs(sum(DB.filter(r=>r.kind==="sale"&&!r.dupT),dbTot))}</span>${(()=>{const B=DB.filter(r=>r.kind==="sale"&&!r.dupT&&dbBuy(r.s));return B.length?`<span class="pill p-ok">DMS खरीद ${rs(sum(B,r=>dbBuy(r.s).cost))} · बचत ${rs(sum(B,r=>dbTot(r)-dbBuy(r.s).cost))} (${B.length} गाड़ियाँ)</span>`:""})()}</div>
+    <div class="row">${nSaved?`<span class="pill p-ok" style="background:#1f8a4c;color:#fff">✔ ${nSaved} Saved</span>`:""}<span class="pill p-ok">${n(r=>r.kind==="sale"&&r.pick&&!r.dupT)} बिक्री मिली</span><span class="pill p-w">${n(r=>r.kind==="sale"&&!r.pick&&!r.dupT)} बिक्री DMS में नहीं मिली</span><span class="pill p-b">${n(dbIsMoney)} आमदनी / खर्च</span>${n(r=>r.kind==="oldsale")?`<span class="pill p-b">${n(r=>r.kind==="oldsale")} पुरानी गाड़ी बिकी</span>`:""}<span class="pill p-r">${n(r=>dbIsMoney(r)?dbCur(r).k==="dup":!!r.dupT)} Double</span>${n(r=>!!r.prevT)?`<span class="pill p-w">${n(r=>!!r.prevT)} पहले save हैं (अंतर के साथ)</span>`:""}<span class="pill p-n">गाड़ियाँ कुल (DP + finance + पुरानी) ${rs(sum(DB.filter(r=>r.kind==="sale"&&!r.dupT),dbTot))}</span>${(()=>{const B=DB.filter(r=>r.kind==="sale"&&!r.dupT&&dbBuy(r.s));return B.length?`<span class="pill p-ok">DMS खरीद ${rs(sum(B,r=>dbBuy(r.s).cost))} · बचत ${rs(sum(B,r=>dbTot(r)-dbBuy(r.s).cost))} (${B.length} गाड़ियाँ)</span>`:""})()}</div>
     <div class="tw"><table><tr><th>✓</th><th>पेज · तारीख</th><th>प्रकार · Folio</th><th>नाम · मॉडल · note</th><th>रकम</th><th>Finance</th><th>पुरानी गाड़ी</th><th>कहाँ जुड़ेगी</th><th></th></tr>
-    ${DB.map((r,i)=>{const sale=r.kind==="sale",os=r.kind==="oldsale",mon=dbIsMoney(r),dupNow=mon?dbCur(r).k==="dup":!!r.dupT;
+    ${DB.map((r,i)=>{if(r.saved){const k={sale:"बिक्री",oldsale:"पुरानी गाड़ी बिकी",income:"आमदनी",expense:"खर्च"}[r.kind];
+        return`<tr style="background:#eef8f1"><td>✔</td><td class="muted">${esc(r.pg||"–")}<br>${fd(r.date)}</td><td colspan="6"><b>${k}</b> · ${r.folio?"चालान <b>"+esc(r.folio)+"</b> · ":""}${esc(r.name)}${r.model?" · "+esc(r.model):""} · ${r.amt?"cash "+rs(r.amt):""}${r.online?" + account "+rs(r.online):""}${r.finAmt?" · finance "+esc(r.co||r.finCode)+" "+rs(r.finAmt):""}${r.oldPrice?" · पुरानी गाड़ी "+rs(r.oldPrice):""}${r.kind==="sale"&&dbTot(r)?" · गाड़ी कुल <b>"+rs(dbTot(r))+"</b>":""}${r.savedRef?` <span class="muted">→ ${esc(r.savedRef)}</span>`:""}</td><td><span class="pill p-ok">✔ Saved</span><br><button class="btn g s" style="margin-top:6px" onclick="dbUnsave(${i})">↶ हटाएँ</button></td></tr>`}
+      const sale=r.kind==="sale",os=r.kind==="oldsale",mon=dbIsMoney(r),dupNow=mon?dbCur(r).k==="dup":!!r.dupT;
       const link=os?`<div style="max-width:330px">${r.old?`Old bikes: <b>${esc(r.old.reg||"—")}</b>${r.old.price?" · खरीदी "+rs(r.old.price):""}${r.old.ch?" · चालान "+esc(r.old.ch):""}`:r.oldNew?`इसी पेज की चालान ${esc(r.oldNew.folio)} वाली पुरानी गाड़ी <b>${esc(r.oldNew.oldReg||"")}</b> (save पर बनेगी, फिर "बिक गई")`:`<span class="neg">Old bikes में यह गाड़ी नहीं मिली — "बिकी" वाली नई entry बनेगी</span>`}</div>`:sale?`<select style="max-width:330px" onchange="dbPick(${i},this.value)"><option value="">— DMS बिक्री नहीं / बाद में —</option>${r.cands.map(c=>`<option value="${esc(c.s.no)}" ${c.s.no===r.pick?"selected":""}>${esc(c.s.no.replace(/^66115/,""))} · ${fd(c.s.date)} · ${esc(c.s.cust)} · ${esc(c.s.model)} (${esc(c.how)})</option>`).join("")}</select>${r.s?`<div class="muted" style="font-size:12px">चेसिस ${esc(r.s.vin)}</div>`:""}`
         :`<select style="max-width:330px" onchange="dbPick(${i},this.value)">${r.c.map((c,k)=>`<option value="${k}" ${c===dbCur(r)?"selected":""}>${c.k==="dup"?"⚠ ":""}${esc(c.t)}</option>`).join("")}</select>`;
-      const notes=[...(!mon&&r.dupT?[`<div class="neg">⚠ ${esc(r.dupT)}</div>`]:[]),...(!mon?r.warn.map(w=>`<div class="neg">⚠ ${esc(w)}</div>`):r.c.filter(c=>c.k==="dup"&&c!==dbCur(r)).slice(0,1).map(c=>`<div class="neg">⚠ ${esc(c.t)}</div>`)),...(!mon?r.info.map(w=>`<div class="muted">ℹ ${esc(w)}</div>`):[])].join("");
+      const notes=[...(r.prevT?[`<div style="color:var(--amber);margin-top:4px"><b>⚠ ${esc(r.prevT)}</b><br>${r.prevDiff.length?"<b>अंतर:</b><br>"+r.prevDiff.map(esc).join("<br>"):"पहले वाली से कोई अंतर नहीं"}<br><span class="muted">अब save करेंगे तो यह अलग entry बनेगी (जैसे बाकी किस्त)। पहले वाली गलत थी, तो नीचे Day Book सूची से उसे Delete करें।</span></div>`]:[]),...(!mon&&r.dupT?[`<div class="neg">⚠ ${esc(r.dupT)}</div>`]:[]),...(!mon?r.warn.map(w=>`<div class="neg">⚠ ${esc(w)}</div>`):r.c.filter(c=>c.k==="dup"&&c!==dbCur(r)).slice(0,1).map(c=>`<div class="neg">⚠ ${esc(c.t)}</div>`)),...(!mon?r.info.map(w=>`<div class="muted">ℹ ${esc(w)}</div>`):[])].join("");
       return`<tr${dupNow?' style="background:#fff5f5"':""}>
        <td><input type="checkbox" style="width:auto" ${r.inc?"checked":""} onchange="DB[${i}].inc=this.checked;DB[${i}].manualInc=true"></td>
        <td><span class="muted">${esc(r.pg||"–")}</span><input type="date" style="width:140px" value="${r.date}" onchange="dbSet(${i},'date',this.value)"></td>
@@ -1066,8 +1087,8 @@ function dbk(){
          :`<input type="number" style="width:100px" value="${r.amt||""}" onchange="dbSet(${i},'amt',this.value)"><select style="width:auto;margin-top:4px;font-size:13px" onchange="DB[${i}].mode=this.value;dbk()">${[["Cash","Cash"],["Bank","Bank / A/C"],["UPI","UPI"]].map(([v,l])=>`<option value="${v}" ${v===r.mode?"selected":""}>${l}</option>`).join("")}</select>`}</td>
        <td>${sale?`<input style="width:80px" placeholder="कंपनी" value="${esc(r.finCode)}" onchange="dbSet(${i},'finCode',this.value)"><input type="number" style="width:95px;margin-top:4px" placeholder="loan ₹" value="${r.finAmt||""}" onchange="dbSet(${i},'finAmt',this.value)">${r.co&&r.finAmt?`<div class="muted" style="font-size:12px">${esc(r.co)}</div>`:""}`:`<span class="muted">—</span>`}</td>
        <td>${sale||os?`<input style="width:115px" placeholder="गाड़ी नंबर" value="${esc(r.oldReg)}" onchange="dbSet(${i},'oldReg',this.value)">${sale?`<input type="number" style="width:95px;margin-top:4px" placeholder="₹" value="${r.oldPrice||""}" onchange="dbSet(${i},'oldPrice',this.value)">`:`<div class="muted" style="font-size:12px">बेची गई गाड़ी</div>`}`:`<span class="muted">—</span>`}</td>
-       <td>${link}${notes}</td><td>${dbStatus(r)}</td></tr>`}).join("")}</table></div>
-    <div class="row" style="margin-top:10px"><button class="btn" onclick="dbSave()">✓ चुनी हुई ${DB.filter(dbOk).length} entries Save करें</button><span class="muted">Double वाली लाइनें save नहीं होंगी। Finance file पहले से हो तो वह बदली नहीं जाती।</span></div>`;return}
+       <td>${link}${notes}</td><td>${dbStatus(r)}${dbRowOk(r)?`<br><button class="btn s" style="margin-top:6px;white-space:nowrap" onclick="dbSaveRow(${i})">✓ Save</button>`:""}</td></tr>`}).join("")}</table></div>
+    <div class="row" style="margin-top:10px"><button class="btn" onclick="dbSave()">✓ बाकी चुनी हुई ${DB.filter(dbOk).length} entries एक साथ Save करें</button><span class="muted">या हर लाइन के आगे "✓ Save" से एक-एक करके। Double वाली लाइनें save नहीं होंगी। Finance file पहले से हो तो वह बदली नहीं जाती।</span></div>`;return}
   const r=range(),A=D.dbk.filter(x=>inR(x.date,r)&&(x.name+" "+(x.det||"")+" "+(x.folio||"")+" "+(x.ref||"")).toLowerCase().includes(dbq.toLowerCase())).sort((a,b)=>b.date.localeCompare(a.date)||String(b.folio||"").localeCompare(String(a.folio||""),undefined,{numeric:true}));
   const isOut=x=>x.kind==="expense"||x.type==="out",S=A.filter(x=>x.kind==="sale");
   $("app").innerHTML=top+`<div class="row">${perSel()}<input placeholder="Search नाम / चालान / details" value="${esc(dbq)}" oninput="dbq=this.value;dbk();refocus(this)"></div>
@@ -1169,6 +1190,8 @@ async function boot(){
     const app=A.initializeApp(fbCfg()),auth=U.getAuth(app);
     let db;try{db=F.initializeFirestore(app,{localCache:F.persistentLocalCache({tabManager:F.persistentMultipleTabManager()})})}catch(e){db=F.getFirestore(app)}
     FB={U,F,auth,db,app};
+    /* App Check: Firebase may require it for the database (enforced), not only for Gemini — start it before any read */
+    try{const AC=await import(b+"firebase-app-check.js");let k=RCK;try{k=localStorage.getItem("de_rck")||RCK}catch(e){}FB.ac=AC.initializeAppCheck(app,{provider:new AC.ReCaptchaEnterpriseProvider(k),isTokenAutoRefreshEnabled:true})}catch(e){console.warn("App Check start failed",e)}
   }catch(e){screen(`<h2 style="margin-top:0">No internet</h2><p>Internet is needed to open the app.</p><button class="btn" onclick="location.reload()">Try again</button>${noData()?"":` <button class="btn g" onclick="setSync('📴 Offline – old copy');nav();render()">See last saved copy</button>`}`);return}
   FB.U.onAuthStateChanged(FB.auth,u=>{if(u){ME=u.email||"";$("logoutBtn").style.display="";start()}else{$("logoutBtn").style.display="none";login()}});
 }
