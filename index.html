@@ -35,11 +35,12 @@ label{font-size:12px;color:var(--mute);display:block;margin-bottom:3px}
 .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
 .btn{border:0;background:var(--red);color:#fff;padding:9px 14px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
 .btn:hover{background:var(--red-d)}.btn.g{background:#fff;color:var(--ink);border:1px solid #cfcfd6}.btn.s{padding:5px 9px;font-size:13px}
-.seg{display:inline-flex;border:1px solid #cfcfd6;border-radius:8px;overflow:hidden}.seg button{border:0;background:#fff;padding:8px 12px;font:inherit;cursor:pointer}.seg button.on{background:var(--ink);color:#fff}
+.seg{display:inline-flex;border:1px solid #cfcfd6;border-radius:8px;overflow-x:auto;max-width:100%;scrollbar-width:none}.seg button{white-space:nowrap;flex:none}.seg button{border:0;background:#fff;padding:8px 12px;font:inherit;cursor:pointer}.seg button.on{background:var(--ink);color:#fff}
 table{width:100%;border-collapse:collapse;background:#fff;font-size:14px}
 th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
 th{background:#fafafb;font-size:12px;color:var(--mute);font-weight:600;position:sticky;top:0}
 .tw{overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:70vh}
+.attl{background:#fff;border:1px solid var(--line);border-radius:12px;margin-top:8px}.attr{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}.attr:last-child{border-bottom:0}.attr .nm{flex:1 1 200px;min-width:160px}.attr .tm{display:flex;flex-direction:column;align-items:flex-start}.attr .bt{display:flex;gap:4px;flex-wrap:wrap}
 .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
 .p-ok{background:#e5f5ec;color:var(--green)}.p-w{background:#fdf3e2;color:var(--amber)}.p-r{background:#fde8e8;color:var(--red)}.p-n{background:#eee;color:#555}.p-b{background:#e6eefc;color:var(--blue)}
 .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -1472,7 +1473,13 @@ function atCalc(m,e){const dim=atDim(m),c={P:0,H:0,L:0,O:0,X:0,SP:0,SH:0,SO:0,la
   return{...c,dim,free,lv,per,satRate,extra,ded:lv*per,pay:N(e.salary)-lv*per+extra}}
 async function atSet(m,eid,day,v){const doc=D.att[m]||(D.att[m]={m,d:{},paidLeaves:N((D.att[atPrevM(m)]||{}).paidLeaves)});doc.d=doc.d||{};doc.d[eid]=doc.d[eid]||{};if(v)doc.d[eid][String(+day)]=v;else delete doc.d[eid][String(+day)];save();await dbCommit([["set","att",m,doc]])}
 const atPrevM=m=>{const d=new Date(+m.slice(0,4),+m.slice(5,7)-2,1);return iso(d).slice(0,7)};
-function atMark(eid,v){const m=atDay.slice(0,7),d=+atDay.slice(8,10),t=$("att_t_"+eid);let val=v;if(v==="P"&&t&&t.value)val="P "+t.value.replace(/^0/,"");atSet(m,eid,d,val).then(att)}
+function atMark(eid,v){const m=atDay.slice(0,7),d=+atDay.slice(8,10),t=$("att_t_"+eid);let val=v;if(v==="P"&&t&&t.value)val="P "+t.value.replace(/^0/,"");
+  const now=$("att_now_"+eid),e=D.emp.find(x=>x.id===eid);
+  if(now){now.className="pill "+atCls(val);now.textContent=val?atLbl(val):"—";const lt=$("att_late_"+eid),L=atLate(val,e);if(lt)lt.textContent=L?`Late ${L} min`:"";_attHold=Date.now()}
+  atSet(m,eid,d,val).then(()=>{if(!now)att();else atCounts()})}
+let _attHold=0;
+function atCounts(){const c=$("att_cnt");if(!c||atView!=="day")return;const m=atDay.slice(0,7),d=+atDay.slice(8,10),E=atEmps(),cnt=k=>E.filter(e=>{const v=atGet(m,e.id,d);return k==="P"?v[0]==="P":k==="X"?!v&&!atOff(m,d,e):v===k}).length;
+  c.innerHTML=`<span class="pill p-ok">${cnt("P")} Present</span><span class="pill p-w">${cnt("H")} ½</span><span class="pill p-r">${cnt("L")} Leave</span><span class="pill p-n">${cnt("O")} Off</span>${cnt("X")?`<span class="pill p-n">${cnt("X")} Due</span>`:""}`}
 async function atAllPresent(m,d){const E=atEmps();if(!E.length)return;const doc=D.att[m]||(D.att[m]={m,d:{},paidLeaves:N((D.att[atPrevM(m)]||{}).paidLeaves)});doc.d=doc.d||{};
   const diff=E.filter(e=>{const v=(doc.d[e.id]||{})[String(d)];return v&&v[0]!=="P"});
   if(!confirm(`${fd(m+"-"+String(d).padStart(2,"0"))}: mark ALL ${E.length} employees Present?${diff.length?`\n${diff.length} marked differently (${diff.map(e=>e.name).join(", ")}) will also become Present.`:""}`))return;
@@ -1517,9 +1524,12 @@ function att(){if(!atDay)atDay=today();if(!atMon)atMon=today().slice(0,7);const 
   if(atView==="emp"){$("app").innerHTML=tabs+`<div class="row"><button class="btn" onclick="empForm()">+ Employee</button></div>${table(["Name","Role","Salary","Status",""],D.emp.slice().sort((a,b)=>(a.ord||0)-(b.ord||0)).map(e=>[`<b>${esc(e.name)}</b> ${atShiftTag(e)}<div class="muted" style="font-size:11px">weekly off: ${{sat:"Saturday",sun:"Sunday",none:"none"}[atOffOf(e)]}</div>`,esc(e.role||""),{n:e.salary?rs(e.salary):`<span class="neg">Enter</span>`},e.active===false?`<span class="pill p-n">Left</span>`:`<span class="pill p-ok">Working</span>`,`<button class="btn g s" onclick="empForm('${jsq(e.id)}')">Edit</button>`]))}`;return}
   if(atView==="day"){const m=atDay.slice(0,7),d=+atDay.slice(8,10),cnt=k=>E.filter(e=>{const v=atGet(m,e.id,d);return k==="P"?v[0]==="P":k==="X"?!v&&!atOff(m,d,e):v===k}).length;
     const sat=atSat(m,d);$("app").innerHTML=tabs+`${sat?`<div class="note" style="margin-bottom:8px"><b>Saturday – off day for staff.</b> Mark <b>Present</b> only for those who came today; they get the extra in their salary. Guards with no weekly off are marked as usual.</div>`:""}<div class="muted" style="margin-bottom:6px">Shop timing <b>9 AM – 7 PM</b> · arrival after 9:00 shows as Late · guards: day 8 AM – 8 PM, night 8 PM – 8 AM</div><div class="row"><input type="date" value="${atDay}" onchange="atDay=this.value;att()" style="width:auto"><button class="btn" onclick="atAllPresent('${m}',${d})">✓ All present</button>${sat?"":`<button class="btn g" onclick="atAllP()">Mark rest Present</button>`}
-    <span class="pill p-ok">${cnt("P")} Present</span><span class="pill p-w">${cnt("H")} ½</span><span class="pill p-r">${cnt("L")} Leave</span><span class="pill p-n">${cnt("O")} Off</span>${cnt("X")?`<span class="pill p-n">${cnt("X")} Due</span>`:""}</div>
-    ${table(["Employee","Now","Arrival time","Mark"],E.slice().sort((a,b)=>({"":0,day:1,night:2}[a.shift||""])-({"":0,day:1,night:2}[b.shift||""])).map(e=>{const v=atGet(m,e.id,d);return[`<b>${esc(e.name)}</b> ${atShiftTag(e,atDay)}<div class="muted">${esc(e.role||"")}${atOff(m,d,e)?" · weekly off today":""}</div>`,`<span class="pill ${atCls(v)}">${v?atLbl(v):"—"}</span>`,`<input id="att_t_${esc(e.id)}" type="time" style="width:auto" value="${v[0]==="P"&&v.slice(2)?(()=>{const mm=atMin(v);return mm==null?"":String(Math.floor(mm/60)).padStart(2,"0")+":"+String(mm%60).padStart(2,"0")})():(e.shift==="night"?"20:00":e.shift==="day"?"08:00":"09:00")}">${atLate(v,e)?`<div class="neg" style="font-size:11px">Late ${atLate(v,e)} min</div>`:""}`,
-      `<span class="row" style="margin:0">${[["P","✓ Present","btn s"],["H","½ Half","btn g s"],["L","Leave","btn g s"],["O","Off","btn g s"],["","Clear","btn g s"]].map(([c,l,k])=>`<button class="${k}" onclick="atMark('${jsq(e.id)}','${c}')">${l}</button>`).join("")}</span>`]}))}`;return}
+    <span id="att_cnt" class="row" style="margin:0;gap:4px"><span class="pill p-ok">${cnt("P")} Present</span><span class="pill p-w">${cnt("H")} ½</span><span class="pill p-r">${cnt("L")} Leave</span><span class="pill p-n">${cnt("O")} Off</span>${cnt("X")?`<span class="pill p-n">${cnt("X")} Due</span>`:""}</span></div>
+    <div class="attl">${E.slice().sort((a,b)=>({"":0,day:1,night:2}[a.shift||""])-({"":0,day:1,night:2}[b.shift||""])).map(e=>{const v=atGet(m,e.id,d);return`<div class="attr">
+      <div class="nm"><b>${esc(e.name)}</b> ${atShiftTag(e,atDay)}<div class="muted">${esc(e.role||"")}${atOff(m,d,e)?" · weekly off today":""}</div></div>
+      <span id="att_now_${esc(e.id)}" class="pill ${atCls(v)}" style="min-width:44px;text-align:center">${v?atLbl(v):"—"}</span>
+      <span class="tm"><input id="att_t_${esc(e.id)}" type="time" style="width:auto" value="${v[0]==="P"&&v.slice(2)?(()=>{const mm=atMin(v);return mm==null?"":String(Math.floor(mm/60)).padStart(2,"0")+":"+String(mm%60).padStart(2,"0")})():(e.shift==="night"?"20:00":e.shift==="day"?"08:00":"09:00")}"><span id="att_late_${esc(e.id)}" class="neg" style="font-size:11px">${atLate(v,e)?`Late ${atLate(v,e)} min`:""}</span></span>
+      <span class="bt">${[["P","✓ Present","btn s"],["H","½ Half","btn g s"],["L","Leave","btn g s"],["O","Off","btn g s"],["","Clear","btn g s"]].map(([c,l,k])=>`<button class="${k}" onclick="atMark('${jsq(e.id)}','${c}')">${l}</button>`).join("")}</span></div>`}).join("")}</div>`;return}
   if(atView==="photo"){const ph=`<div class="card"><b>📷 Attendance register photo</b><div class="muted">A straight, clear photo of both pages of the open register. Names at the top should be clear.</div>
       <div class="row" style="margin-top:6px"><label style="margin:0">Month</label><input id="at_pm" type="month" value="${atMon}" style="width:auto"><label class="btn" style="cursor:pointer">📷 Choose photo<input type="file" accept="image/*" multiple style="display:none" onchange="atPhoto(this.files);this.value=''"></label></div>${aiSetBox()}<div id="at_ph">${atPh}</div></div>`;
     if(!ATR){$("app").innerHTML=tabs+ph;return}const dim=atDim(ATR[0].m);
@@ -1983,7 +1993,7 @@ function cPut(c,id,obj){if(!FB)return;setSync("⏳ Saving…");FB.F.setDoc(R_(c,
 function cDel(c,id){if(!FB)return;setSync("⏳ Saving…");FB.F.deleteDoc(R_(c,sid(id))).then(()=>setSync("☁ Synced · "+ME),cErr)}
 function cErr(e){const c=(e&&e.code)||"";if(/permission-denied/.test(c)){UNSUB.forEach(u=>{try{u()}catch(x){}});UNSUB=[];screen(`<h2 style="margin-top:0">Access not given</h2><p><b>${esc(ME)}</b> cannot open this data yet. Add this email in Firebase → Firestore → Rules.</p>${rulesBox(ME,((D.staff||{}).fin||[]).join(", "),((D.staff||{}).stock||[]).join(", "))}<button class="btn" onclick="logout()">Logout</button>`);return}setSync("⚠ "+(c||e.message||e))}
 let _rT=0;function refresh(){clearTimeout(_rT);_rT=setTimeout(refresh_,200)}
-function refresh_(){if(dlg.open)return;const a=document.activeElement;if(a&&/INPUT|SELECT|TEXTAREA/.test(a.tagName)&&$("app").contains(a))return;nav();render()}
+function refresh_(){if(dlg.open)return;if(tab==="att"&&atView==="day"&&Date.now()-_attHold<4000){atCounts();return}const a=document.activeElement;if(a&&/INPUT|SELECT|TEXTAREA/.test(a.tagName)&&$("app").contains(a))return;nav();render()}
 function saveColl(no){const v={no,date:$("m_d").value,amt:N($("m_a").value),mode:$("m_m").value};D.coll[no]=v;save();cPut("coll",no,v);dlg.close();nav();render()}
 function undoColl(no){delete D.coll[no];save();cDel("coll",no);nav();render()}
 function delExp(id){if(!confirm("Delete this entry?"))return;D.exp=D.exp.filter(e=>e.id!==id);save();cDel("exp",id);dlg.close();render()}
@@ -1996,8 +2006,12 @@ function dl(blob,name){const a=document.createElement("a");a.href=URL.createObje
 function backup(){dl(new Blob([JSON.stringify(D)],{type:"application/json"}),`deepanshu-enterprises-backup-${today()}.json`)}
 function restore(inp){const fl=inp.files[0];if(!fl)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.vs||!x.sv)throw 0;if(confirm("Replace all data (for everyone) with this backup?"))restoreAll(x)}catch(e){alert("Not a valid backup file")}};r.readAsText(fl);inp.value=""}
 const dlg=$("dlg");
+(function(){const fix=()=>{const h=document.querySelector("header"),n=$("nav");if(h&&n&&n.style)n.style.top=h.offsetHeight+"px"};try{fix();window.addEventListener("resize",fix);setTimeout(fix,500)}catch(e){}})();
 /* keep the page where it is when a screen is redrawn (no jump to top while marking attendance etc.) */
-(function(){const keep=f=>function(...a){const y=window.scrollY||0,r=f.apply(this,a);if(!_jump&&y){scrollTo(0,y);requestAnimationFrame(()=>{if(Math.abs((window.scrollY||0)-y)>2)scrollTo(0,y)})}return r};
+(function(){let depth=0;const inner=()=>[...document.querySelectorAll("#app .tw, #app [data-keep]")];
+  const keep=f=>function(...a){if(depth)return f.apply(this,a);depth++;const y=window.scrollY||0,T=inner().map(e=>[e.scrollTop,e.scrollLeft]);let r;
+    try{r=f.apply(this,a)}finally{depth--}
+    if(!_jump){const put=late=>{if(y&&(late?(window.scrollY||0)<1:Math.abs((window.scrollY||0)-y)>1))scrollTo(0,y);inner().forEach((e,i)=>{if(T[i]&&(!late||(e.scrollTop<1&&e.scrollLeft<1))){if(e.scrollTop!==T[i][0])e.scrollTop=T[i][0];if(e.scrollLeft!==T[i][1])e.scrollLeft=T[i][1]}})};put(false);requestAnimationFrame(()=>put(true))}return r};
   ["render","att","wsk","stk","dbk","daily","jry","money","oldb","fin","veh","svc","acc","col","parts","dash","imp","wcl"].forEach(n=>{try{if(typeof window[n]==="function")window[n]=keep(window[n])}catch(e){}})})();
 boot();
 </script>
