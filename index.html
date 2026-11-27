@@ -1365,7 +1365,7 @@ function jry(){const r=range(),J=jrData(r);
 async function jrRate(v){D.jr={...(D.jr||{}),rate:N(v)};save();await dbCommit([["set","meta","jr",D.jr]]);jry()}
 
 /* ================= STOCK: DMS stock list · physical count by staff · staff logins ================= */
-let stkV="list",stkQ="",stkSort="val",stkMin="",stkMax="",stkCat="",stkCS="all",stkF="diff",stkLim=300;
+let STKSEL=new Set(),stkLS="",stkV="list",stkQ="",stkSort="val",stkMin="",stkMax="",stkCat="",stkCS="all",stkF="diff",stkLim=300;
 const STK_BANDS=[[10000,0,"₹10,000 +"],[5000,10000,"₹5,000 – 10,000"],[1000,5000,"₹1,000 – 5,000"],[500,1000,"₹500 – 1,000"],[100,500,"₹100 – 500"],[0,100,"Below ₹100"]];
 const STK_KEYS=["id","list","date","by","name","at","n","done","j","x"];
 function stkItems(){const m={};(D.stock||[]).forEach(r=>{const k=String(r.part||"").trim();if(!k)return;const o=m[k]||(m[k]={part:k,name:r.name||"",cat:r.cat||"",qty:0,val:0});o.qty+=N(r.qty);o.val+=N(r.val)});
@@ -1374,6 +1374,8 @@ function stkFilter(A){const q=stkQ.trim().toLowerCase(),mn=N(stkMin),mx=N(stkMax
   A=A.filter(x=>(!q||(x.part+" "+x.name).toLowerCase().includes(q))&&(!stkCat||x.cat===stkCat)&&(stkMin===""||x.price>=mn)&&(stkMax===""||x.price<mx));
   const f={val:(a,b)=>b.val-a.val,price:(a,b)=>b.price-a.price,priceLo:(a,b)=>a.price-b.price,qty:(a,b)=>b.qty-a.qty,name:(a,b)=>a.name.localeCompare(b.name)}[stkSort]||((a,b)=>b.val-a.val);
   return A.sort(f)}
+const q2=v=>Math.round(N(v)*100)/100;
+const stkLists=()=>Object.values((D.stkl&&D.stkl.lists)||{}).sort((a,b)=>(b.at||0)-(a.at||0));
 const stkPhys=p=>(D.phys&&D.phys.j&&D.phys.j[p])||null;
 function stkSet(k,v){if(k==="stkCat")stkCat=v;else if(k==="stkMin")stkMin=v;else if(k==="stkMax")stkMax=v;else if(k==="stkSort")stkSort=v;stkLim=300;stk()}
 const stkWho=c=>((D.staff&&D.staff.names)||{})[c.by]||c.name||c.by;
@@ -1394,50 +1396,55 @@ function stkListHtml(){const all=stkItems().filter(x=>x.qty>0),A=stkFilter(all),
    <label class="muted" style="margin:0">Price ₹ from</label><input type="number" style="width:90px" placeholder="min" value="${esc(stkMin)}" onchange="stkSet('stkMin',this.value)"><label class="muted" style="margin:0">below</label><input type="number" style="width:90px" placeholder="max" value="${esc(stkMax)}" onchange="stkSet('stkMax',this.value)">
    <select onchange="stkSet('stkSort',this.value)">${[["val","Sort: highest total value"],["price","Sort: costliest piece first"],["priceLo","Sort: cheapest piece first"],["qty","Sort: most pieces"],["name","Sort: name A–Z"]].map(([v,l])=>`<option value="${v}" ${v===stkSort?"selected":""}>${l}</option>`).join("")}</select>
    ${stkQ||stkCat||stkMin!==""||stkMax!==""?`<button class="btn g s" onclick="stkQ='';stkCat='';stkMin='';stkMax='';stkLim=300;stk()">Clear filters</button>`:""}
-   <button class="btn g s" onclick="stkXls()">⬇ Excel</button> <button class="btn s" onclick="stkPublish()">📋 Send these ${A.length} parts to staff for counting</button></div>
-  ${table(["Part no.","Name","Category","DMS qty","Price / piece","Value",...(D.phys&&D.phys.j?["Physical (counted)"]:[])],A.slice(0,stkLim).map(x=>{const p=stkPhys(x.part);return[`<b>${esc(x.part)}</b>`,esc(x.name),`<span class="muted">${esc(x.cat)}</span>`,{n:x.qty},{n:rs(x.price)},{n:rs(x.val)},...(D.phys&&D.phys.j?[{n:p?`${p[0]}${p[0]!==x.qty?` <span class="pill ${p[0]<x.qty?"p-r":"p-w"}">${p[0]-x.qty>0?"+":""}${p[0]-x.qty}</span>`:""}<div class="muted" style="font-size:11px">${fd(p[1])}</div>`:"–"}]:[])]}))}
+   <button class="btn g s" onclick="stkXls()">⬇ Excel</button></div>
+  <div class="card" style="margin-top:10px;background:#f6f9ff"><b>Ask staff how many are there today:</b> tick the parts below (or tick none to send everything shown), then press the button. The employee sees only part no. + name and types how many pieces are on the shelf; you see the answer in <b>Physical count</b>.
+   <div class="row" style="margin-top:6px"><button class="btn" onclick="stkPublish()">📋 Ask staff to count ${STKSEL.size?`${STKSEL.size} ticked parts`:`all ${A.length} parts shown`}</button>${STKSEL.size?`<button class="btn g s" onclick="STKSEL.clear();stk()">Untick all</button>`:""}</div></div>
+  ${table([`<input type="checkbox" style="width:auto" title="Tick all shown" ${A.length&&A.slice(0,stkLim).every(x=>STKSEL.has(x.part))?"checked":""} onchange="stkTickAll(this.checked)">`,"Part no.","Name","Category","DMS qty","Price / piece","Value",...(D.phys&&D.phys.j?["Physical (counted)"]:[])],A.slice(0,stkLim).map(x=>{const p=stkPhys(x.part);return[`<input type="checkbox" style="width:auto" ${STKSEL.has(x.part)?"checked":""} onchange="stkTick('${jsq(x.part)}',this.checked)">`,`<b>${esc(x.part)}</b>`,esc(x.name),`<span class="muted">${esc(x.cat)}</span>`,{n:q2(x.qty)},{n:rs(x.price)},{n:rs(x.val)},...(D.phys&&D.phys.j?[{n:p?`${p[0]}${q2(p[0])!==q2(x.qty)?` <span class="pill ${p[0]<x.qty?"p-r":"p-w"}">${p[0]-x.qty>0?"+":""}${q2(p[0]-x.qty)}</span>`:""}<div class="muted" style="font-size:11px">${fd(p[1])}</div>`:"–"}]:[])]}))}
   ${A.length>stkLim?`<p><button class="btn g s" onclick="stkLim+=500;stk()">Show more (${A.length-stkLim} more)</button></p>`:""}`}
 function stkXls(){const A=stkFilter(stkItems().filter(x=>x.qty>0));const ws=XLSX.utils.aoa_to_sheet([["Part no.","Name","Category","DMS qty","Price / piece","Value"],...A.map(x=>[x.part,x.name,x.cat,x.qty,Math.round(x.price*100)/100,Math.round(x.val)])]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Stock");XLSX.writeFile(wb,`parts-stock-${today()}.xlsx`)}
-async function stkPublish(){const A=stkFilter(stkItems().filter(x=>x.qty>0));if(!A.length)return alert("No parts in the list");if(!FB)return alert("Login is needed to send the list");
-  const t=prompt(`Send ${A.length} parts to staff for counting?\nStaff will see only part no. and name, not the DMS quantity.\nThe previous count list will be replaced.\n\nName for this count:`,`Stock count ${fd(today())}`);if(t===null)return;
-  const id=uid(),items=A.map(x=>[x.part,x.name,x.cat]).sort((a,b)=>(a[2]+a[1]).localeCompare(b[2]+b[1])),CHK=2500,W=[],nC=Math.ceil(items.length/CHK);
-  for(let i=0;i<nC;i++)W.push(["set","stkl","c"+i,{i,list:id,j:JSON.stringify(items.slice(i*CHK,(i+1)*CHK))}]);
-  const old=D.stkl&&D.stkl.info?N(D.stkl.info.chunks):0;for(let i=nC;i<old;i++)W.push(["del","stkl","c"+i]);
-  const info={id,title:t.trim()||"Stock count",date:today(),n:items.length,chunks:nC,at:Date.now(),by:ME};W.push(["set","stkl","info",info]);
-  D.stkl={info,items};save();if(await dbCommit(W)!==false){alert(`✔ List sent: ${items.length} parts. Staff can now log in and count.`);stkV="count";stk()}}
+function stkTick(p,on){if(on)STKSEL.add(p);else STKSEL.delete(p);stk()}
+function stkTickAll(on){stkFilter(stkItems().filter(x=>x.qty>0)).slice(0,stkLim).forEach(x=>on?STKSEL.add(x.part):STKSEL.delete(x.part));stk()}
+async function stkPublish(){const all=stkItems(),A=STKSEL.size?all.filter(x=>STKSEL.has(x.part)):stkFilter(all.filter(x=>x.qty>0));if(!A.length)return alert("No parts in the list");if(!FB)return alert("Login is needed to send the list");
+  const t=prompt(`Ask staff to count these ${A.length} parts today?\nThey see only part no. and name, not the DMS quantity.\n\nName for this count:`,`${A.length===1?A[0].name:A.length+" parts"} · ${fd(today())}`);if(t===null)return;
+  const id=uid(),items=A.map(x=>[x.part,x.name,x.cat]).sort((a,b)=>(a[2]+a[1]).localeCompare(b[2]+b[1]));
+  const L={id,title:t.trim()||"Stock count",date:today(),n:items.length,at:Date.now(),by:ME,open:true,j:JSON.stringify(items)};
+  D.stkl=D.stkl&&D.stkl.lists?D.stkl:{lists:{}};D.stkl.lists[id]={...L,items};STKSEL.clear();save();
+  if(await dbCommit([["set","stkl",id,L]])!==false){alert(`✔ Sent to staff: ${items.length} parts.\nWhen they fill it, the answer shows in Physical count.`);stkV="count";stkLS=id;stkCS="all";stk()}}
 /* ---- owner: compare counts ---- */
-function stkCounts(){const L=D.stkl&&D.stkl.info;return(D.stkc||[]).filter(c=>c&&c.j).sort((a,b)=>(b.at||0)-(a.at||0)).map(c=>({...c,cur:L&&c.list===L.id}))}
+function stkCounts(lid){return(D.stkc||[]).filter(c=>c&&c.j&&(!lid||c.list===lid)).sort((a,b)=>(b.at||0)-(a.at||0))}
 function stkMap(cs){const m={},x={};cs.forEach(c=>{let j={},e={};try{j=JSON.parse(c.j||"{}")}catch(er){}try{e=JSON.parse(c.x||"{}")}catch(er){}Object.entries(j).forEach(([p,q])=>{if(q===""||q==null)return;m[p]=(m[p]||0)+N(q)});Object.assign(x,e)});return{m,x}}
-function stkCompare(cs,useList){const {m,x}=stkMap(cs),S={};stkItems().forEach(s=>S[s.part]=s);
-  const parts=new Set(Object.keys(m));if(useList&&D.stkl&&D.stkl.items)D.stkl.items.forEach(r=>parts.add(r[0]));
-  const nm={};if(D.stkl&&D.stkl.items)D.stkl.items.forEach(r=>nm[r[0]]=r[1]);
-  return[...parts].map(p=>{const s=S[p],sys=s?s.qty:0,price=s?s.price:0,cnt=p in m?m[p]:null,d=cnt===null?null:cnt-sys;
-    return{part:p,name:(s&&s.name)||nm[p]||x[p]||"",cat:s?s.cat:"",sys,price,cnt,d,dv:d===null?0:d*price,st:cnt===null?"nc":d===0?"ok":d<0?"short":"extra",notDMS:!s}}).sort((a,b)=>Math.abs(b.dv)-Math.abs(a.dv)||a.part.localeCompare(b.part))}
-function stkCountHtml(){const L=D.stkl&&D.stkl.info,C=stkCounts(),cur=C.filter(c=>c.cur);
-  if(!L&&!C.length)return`<div class="card empty" style="margin-top:12px">No count yet. In <b>Stock today</b>, filter the parts you want counted (e.g. price from ₹1,000) and press <b>Send … parts to staff for counting</b>. Then add the employee's login in <b>Staff logins</b>.</div>`;
-  const opts=[...(cur.length>1?[["all",`All staff combined · ${L.title} (${cur.length} people)`]]:[]),...C.map(c=>[c.id,`${stkWho(c)} · ${fd(c.date)} · ${c.n||0} counted · ${c.ok?"accepted":c.done?"submitted":"in progress"}${c.cur?"":" (old list)"}`])];
+function stkCompare(cs,L){const {m,x}=stkMap(cs),S={};stkItems().forEach(s=>S[s.part]=s);
+  const parts=new Set(Object.keys(m)),nm={};if(L&&L.items)L.items.forEach(r=>{parts.add(r[0]);nm[r[0]]=r[1]});
+  return[...parts].map(p=>{const s=S[p],sys=s?s.qty:0,price=s?s.price:0,cnt=p in m?m[p]:null,d=cnt===null?null:q2(cnt-sys);
+    return{part:p,name:(s&&s.name)||nm[p]||x[p]||"",cat:s?s.cat:"",sys:q2(sys),price,cnt,d,dv:d===null||Math.abs(d)<0.5?0:d*price,st:cnt===null?"nc":Math.abs(d)<0.5?"ok":d<0?"short":"extra",notDMS:!s}}).sort((a,b)=>Math.abs(b.dv)-Math.abs(a.dv)||a.part.localeCompare(b.part))}
+function stkCountHtml(){const LS=stkLists();
+  if(!LS.length)return`<div class="card empty" style="margin-top:12px">Nothing asked yet. In <b>Stock today</b>, tick the parts (or filter them, e.g. price from ₹1,000) and press <b>Ask staff to count</b>. Add the employee's login in <b>Staff logins</b>.</div>`;
+  if(!LS.some(l=>l.id===stkLS))stkLS=(LS.find(l=>l.open!==false)||LS[0]).id;const L=LS.find(l=>l.id===stkLS),C=stkCounts(L.id);
+  const opts=[...(C.length>1?[["all",`All staff combined (${C.length} people)`]]:[]),...C.map(c=>[c.id,`${stkWho(c)} · ${fd(c.date)} · ${c.n||0}/${L.n} counted · ${c.ok?"accepted":c.done?"submitted":"in progress"}`])];
   if(!opts.some(o=>o[0]===stkCS))stkCS=opts.length?opts[0][0]:"";
-  const sel=stkCS==="all"?cur:C.filter(c=>c.id===stkCS),useList=sel.length&&sel.every(c=>c.cur);
-  const R=sel.length?stkCompare(sel,useList):[],mt=D.meta&&D.meta.stock;
+  const sel=stkCS==="all"?C:C.filter(c=>c.id===stkCS),R=stkCompare(sel,L),mt=D.meta&&D.meta.stock;
   const g=k=>R.filter(r=>r.st===k),sh=g("short"),ex=g("extra"),ok=g("ok"),nc=g("nc");
   const F=R.filter(r=>stkF==="all"||(stkF==="diff"?r.st==="short"||r.st==="extra":r.st===stkF));
-  const pill={ok:"p-ok",short:"p-r",extra:"p-w",nc:"p-n"},lbl={ok:"✔ Matches",short:"Short",extra:"Extra",nc:"Not counted"};
+  const pill={ok:"p-ok",short:"p-r",extra:"p-w",nc:"p-n"},lbl={ok:"✔ Matches",short:"Short",extra:"Extra",nc:"Not counted yet"};
   const cDate=sel.length?sel.map(c=>c.date).sort().pop():"";
-  return`<div class="card" style="margin-top:10px">${L?`<b>Current count list:</b> ${esc(L.title)} · ${L.n} parts · sent ${fd(L.date)} <span class="muted">· ${cur.length} employee(s) counting: ${cur.map(c=>`${esc(stkWho(c))} ${c.n||0}/${L.n}${c.done?" ✔":""}`).join(", ")||"nobody yet"}</span>`:"No count list sent yet."}</div>
-  ${opts.length?`<div class="row" style="margin-top:10px"><select onchange="stkCS=this.value;stk()">${opts.map(([v,l])=>`<option value="${esc(v)}" ${v===stkCS?"selected":""}>${esc(l)}</option>`).join("")}</select></div>`:`<p class="muted">Waiting for staff to start counting.</p>`}
-  ${sel.length?`${mt&&cDate&&mt.at!==cDate?`<div class="note" style="margin-top:10px;background:#fff8e6">DMS stock in the app is from <b>${fd(mt.at)}</b> but this count is from <b>${fd(cDate)}</b>. Sales and purchases in between will show as differences. Import the Parts Stock Report of the count day for an exact match.</div>`:""}
-  <div class="grid" style="margin-top:10px"><div class="card stat"><div class="l">Counted</div><div class="n">${R.length-nc.length}</div><div class="s">of ${R.length} parts</div></div><div class="card stat"><div class="l">Matches</div><div class="n pos">${ok.length}</div></div><div class="card stat click" onclick="stkF='short';stk()"><div class="l">Short (less than DMS)</div><div class="n neg">${sh.length}</div><div class="s">${rs(Math.abs(sum(sh,r=>r.dv)))}</div></div><div class="card stat click" onclick="stkF='extra';stk()"><div class="l">Extra (more than DMS)</div><div class="n">${ex.length}</div><div class="s">${rs(sum(ex,r=>r.dv))}</div></div><div class="card stat click" onclick="stkF='nc';stk()"><div class="l">Not counted</div><div class="n">${nc.length}</div></div></div>
-  <div class="row" style="margin-top:10px"><span class="seg">${[["diff","Differences"],["short","Short"],["extra","Extra"],["nc","Not counted"],["ok","Matches"],["all","All"]].map(([v,l])=>`<button class="${stkF===v?"on":""}" onclick="stkF='${v}';stk()">${l}</button>`).join("")}</span>
-   <button class="btn g s" onclick="stkCmpXls()">⬇ Excel</button> ${sel.every(c=>c.ok)?`<span class="pill p-ok">✔ Accepted as actual stock</span>`:`<button class="btn s" onclick="stkAccept()">✓ Accept this count as actual stock</button>`}${stkCS!=="all"?` <button class="btn g s" onclick="stkDelCount('${jsq(stkCS)}')">Delete this count</button>`:""}</div>
-  ${table(["Part no.","Name","DMS qty","Counted","Difference","Value of difference","Result"],F.slice(0,stkLim).map(r=>[`<b>${esc(r.part)}</b>${r.notDMS?` <span class="pill p-w">not in DMS stock</span>`:""}`,esc(r.name),{n:r.sys},{n:r.cnt===null?"–":r.cnt},{n:r.d===null?"":`<span class="${r.d<0?"neg":r.d>0?"":"pos"}">${r.d>0?"+":""}${r.d}</span>`},{n:r.d?`<span class="${r.dv<0?"neg":""}">${rs(r.dv)}</span>`:""},`<span class="pill ${pill[r.st]}">${lbl[r.st]}</span>`]))}
+  return`<div class="row" style="margin-top:10px;flex-wrap:wrap"><select onchange="stkLS=this.value;stkCS='all';stk()">${LS.map(l=>`<option value="${esc(l.id)}" ${l.id===L.id?"selected":""}>${l.open===false?"(closed) ":""}${esc(l.title)} · ${l.n} parts · asked ${fd(l.date)} · ${stkCounts(l.id).length} answered</option>`).join("")}</select>
+   ${opts.length?`<select onchange="stkCS=this.value;stk()">${opts.map(([v,l])=>`<option value="${esc(v)}" ${v===stkCS?"selected":""}>${esc(l)}</option>`).join("")}</select>`:`<span class="pill p-w">Waiting for staff to fill it</span>`}
+   ${L.open===false?`<button class="btn g s" onclick="stkOpen('${jsq(L.id)}',true)">Open again for staff</button>`:`<button class="btn g s" onclick="stkOpen('${jsq(L.id)}',false)">Close (hide from staff)</button>`} <button class="btn g s" onclick="stkDelList('${jsq(L.id)}')">Delete this list</button></div>
+  ${sel.length&&mt&&cDate&&mt.at!==cDate?`<div class="note" style="margin-top:10px;background:#fff8e6">DMS stock in the app is from <b>${fd(mt.at)}</b> but this count is from <b>${fd(cDate)}</b>. Sales and purchases in between will show as differences. Import the Parts Stock Report of the count day for an exact match.</div>`:""}
+  <div class="grid" style="margin-top:10px"><div class="card stat"><div class="l">Counted</div><div class="n">${R.length-nc.length}</div><div class="s">of ${R.length} parts</div></div><div class="card stat"><div class="l">Matches</div><div class="n pos">${ok.length}</div></div><div class="card stat click" onclick="stkF='short';stk()"><div class="l">Short (less than DMS)</div><div class="n neg">${sh.length}</div><div class="s">${rs(Math.abs(sum(sh,r=>r.dv)))}</div></div><div class="card stat click" onclick="stkF='extra';stk()"><div class="l">Extra (more than DMS)</div><div class="n">${ex.length}</div><div class="s">${rs(sum(ex,r=>r.dv))}</div></div><div class="card stat click" onclick="stkF='nc';stk()"><div class="l">Not counted yet</div><div class="n">${nc.length}</div></div></div>
+  <div class="row" style="margin-top:10px"><span class="seg">${[["all","All"],["diff","Differences"],["short","Short"],["extra","Extra"],["nc","Not counted"],["ok","Matches"]].map(([v,l])=>`<button class="${stkF===v?"on":""}" onclick="stkF='${v}';stk()">${l}</button>`).join("")}</span>
+   <button class="btn g s" onclick="stkCmpXls()">⬇ Excel</button> ${!sel.length?"":sel.every(c=>c.ok)?`<span class="pill p-ok">✔ Accepted as actual stock</span>`:`<button class="btn s" onclick="stkAccept()">✓ Accept this count as actual stock</button>`}${stkCS&&stkCS!=="all"?` <button class="btn g s" onclick="stkDelCount('${jsq(stkCS)}')">Delete this answer</button>`:""}</div>
+  ${table(["Part no.","Name","DMS qty","Staff counted","Difference","Value of difference","Result"],F.slice(0,stkLim).map(r=>[`<b>${esc(r.part)}</b>${r.notDMS?` <span class="pill p-w">not in DMS stock</span>`:""}`,esc(r.name),{n:r.sys},{n:r.cnt===null?"–":`<b>${r.cnt}</b>`},{n:r.d===null?"":`<span class="${r.d<0?"neg":r.d>0?"":"pos"}">${r.d>0?"+":""}${r.d}</span>`},{n:r.d?`<span class="${r.dv<0?"neg":""}">${rs(r.dv)}</span>`:""},`<span class="pill ${pill[r.st]}">${lbl[r.st]}</span>`]))}
   ${F.length>stkLim?`<p><button class="btn g s" onclick="stkLim+=500;stk()">Show more</button></p>`:""}
-  <p class="muted">Short = fewer pieces on the shelf than DMS says (missing / sold without bill / wrong entry). Extra = more on the shelf than DMS (purchase not entered / wrong part no.). "Accept" saves the counted quantity as the actual stock; it shows in <b>Stock today</b> next to the DMS quantity. DMS data itself is not changed.</p>`:""}`}
-function stkSelNow(){const C=stkCounts();return stkCS==="all"?C.filter(c=>c.cur):C.filter(c=>c.id===stkCS)}
-function stkCmpXls(){const s=stkSelNow(),R=stkCompare(s,s.every(c=>c.cur));const ws=XLSX.utils.aoa_to_sheet([["Part no.","Name","DMS qty","Counted","Difference","Price / piece","Value of difference","Result"],...R.map(r=>[r.part,r.name,r.sys,r.cnt===null?"":r.cnt,r.d===null?"":r.d,Math.round(r.price*100)/100,Math.round(r.dv),{ok:"Matches",short:"Short",extra:"Extra",nc:"Not counted"}[r.st]])]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Count");XLSX.writeFile(wb,`stock-count-${today()}.xlsx`)}
+  <p class="muted">Short = fewer pieces on the shelf than DMS says (missing / sold without bill / wrong entry). Extra = more on the shelf than DMS (purchase not entered / wrong part no.). Oil and similar items may show decimals in DMS (litres). "Accept" saves the counted quantity as the actual stock; it shows in <b>Stock today</b> next to the DMS quantity. DMS data itself is not changed.</p>`}
+async function stkOpen(id,on){const L=D.stkl.lists[id];if(!L)return;L.open=on;const o={...L};delete o.items;save();await dbCommit([["set","stkl",id,o]]);stk()}
+async function stkDelList(id){const L=D.stkl.lists[id],C=stkCounts(id);if(!L||!confirm(`Delete the list "${L.title}"${C.length?` and its ${C.length} answer(s)`:""}?`))return;delete D.stkl.lists[id];D.stkc=(D.stkc||[]).filter(c=>c.list!==id);save();await dbCommit([["del","stkl",id],...C.map(c=>["del","stkc",c.id])]);stkLS="";stk()}
+function stkSelNow(){const C=stkCounts(stkLS);return stkCS==="all"?C:C.filter(c=>c.id===stkCS)}
+function stkCmpXls(){const s=stkSelNow(),R=stkCompare(s,D.stkl.lists[stkLS]);const ws=XLSX.utils.aoa_to_sheet([["Part no.","Name","DMS qty","Counted","Difference","Price / piece","Value of difference","Result"],...R.map(r=>[r.part,r.name,r.sys,r.cnt===null?"":r.cnt,r.d===null?"":r.d,Math.round(r.price*100)/100,Math.round(r.dv),{ok:"Matches",short:"Short",extra:"Extra",nc:"Not counted"}[r.st]])]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Count");XLSX.writeFile(wb,`stock-count-${today()}.xlsx`)}
 async function stkAccept(){const s=stkSelNow();if(!s.length)return;const {m}=stkMap(s),n=Object.keys(m).length,date=s.map(c=>c.date).sort().pop();
   if(!confirm(`Save the counted quantity of ${n} parts as the actual stock (${fd(date)})?\nAfter this the employee cannot change this count.`))return;
   const j={...((D.phys&&D.phys.j)||{})};Object.entries(m).forEach(([p,q])=>j[p]=[q,date]);D.phys={date,at:Date.now(),by:ME,j};
-  const W=[["set","meta","phys",D.phys],...s.map(c=>{const o={...c};delete o.cur;o.ok=true;o.okAt=Date.now();return["set","stkc",c.id,o]})];
+  const W=[["set","meta","phys",D.phys],...s.map(c=>{const o={...c};o.ok=true;o.okAt=Date.now();return["set","stkc",c.id,o]})];
   s.forEach(c=>{const o=(D.stkc||[]).find(x=>x.id===c.id);if(o)o.ok=true});save();await dbCommit(W);stk()}
 async function stkDelCount(id){const c=(D.stkc||[]).find(x=>x.id===id);if(!c||!confirm(`Delete the count of ${stkWho(c)} (${fd(c.date)})?`))return;D.stkc=D.stkc.filter(x=>x.id!==id);save();await dbCommit([["del","stkc",id]]);stk()}
 /* ---- owner: staff logins ---- */
@@ -1461,23 +1468,24 @@ async function stkMakeLogin(){const n=$("sk_n").value.trim(),e=$("sk_e").value.t
 async function stkStaffRm(e){if(!confirm(`Remove ${e} from stock-count staff?\n(Then publish the new Rules text so the login stops working.)`))return;const S={...(D.staff||{})};S.stock=(S.stock||[]).filter(x=>x!==e);await stkStaffSave(S);stk()}
 /* ---- employee (stock staff) screen ---- */
 let SK=null;
-async function stockStaffStart(info){STAFF="stock";try{localStorage.removeItem(KEY)}catch(e){}D=EMPTY();$("nav").innerHTML="";document.querySelectorAll("header .btn.g").forEach(b=>{if(b.id!=="logoutBtn")b.style.display="none"});
-  document.querySelector("header small").textContent="Stock count";screen(`<div class="empty">⏳ Loading the count list…</div>`);
-  try{const {F}=FB,snap=await F.getDocs(C_("stkl"));let items=[];info=null;snap.docs.map(d=>d.data()).filter(x=>x&&x.j).sort((a,b)=>a.i-b.i).forEach(x=>{try{items=items.concat(JSON.parse(x.j))}catch(e){}});
-    const ii=snap.docs.find(d=>d.id==="info");info=ii?ii.data():null;{const seen=new Set();items=items.filter(r=>r&&!seen.has(r[0])&&seen.add(r[0]))}
-    if(!info){SK={info:null};return stkSUI()}
-    const id=sid(info.id+"_"+ME);let mine=null;try{const d=await F.getDoc(R_("stkc",id));mine=d.exists()?d.data():null}catch(e){}
-    let loc={};try{loc=JSON.parse(localStorage.getItem(KEY+"_stc_"+id)||"{}")}catch(e){}
-    let j={},x={};try{j=JSON.parse((mine&&mine.j)||"{}");x=JSON.parse((mine&&mine.x)||"{}")}catch(e){}
-    if(loc.at&&(!mine||loc.at>(mine.at||0))){j=loc.j||j;x=loc.x||x}
-    SK={info,items:items.filter(r=>r&&r[0]),id,j,x,done:!!(mine&&mine.done),ok:!!(mine&&mine.ok),q:"",f:"all",cat:"",lim:150,t:null,name:""};setSync("☁ "+ME);stkSUI()}
+async function stockStaffStart(pick){STAFF="stock";try{localStorage.removeItem(KEY)}catch(e){}D=EMPTY();$("nav").innerHTML="";document.querySelectorAll("header .btn.g").forEach(b=>{if(b.id!=="logoutBtn")b.style.display="none"});
+  document.querySelector("header small").textContent="Stock count";screen(`<div class="empty">⏳ Loading…</div>`);
+  try{const {F}=FB,snap=await F.getDocs(C_("stkl"));const LS=snap.docs.map(d=>d.data()).filter(x=>x&&x.id&&x.j&&x.title&&x.open!==false).sort((a,b)=>(b.at||0)-(a.at||0));
+    const mine={};await Promise.all(LS.map(async L=>{const id=sid(L.id+"_"+ME);try{const d=await F.getDoc(R_("stkc",id));if(d.exists())mine[L.id]=d.data()}catch(e){}}));
+    if(!pick&&LS.length!==1){SK={lists:LS,mine,info:null};setSync("☁ "+ME);return stkSUI()}
+    const info=LS.find(l=>l.id===pick)||LS[0];if(!info){SK={lists:[],mine,info:null};return stkSUI()}
+    let items=[];try{items=JSON.parse(info.j)}catch(e){}{const seen=new Set();items=items.filter(r=>r&&r[0]&&!seen.has(r[0])&&seen.add(r[0]))}
+    const id=sid(info.id+"_"+ME),my=mine[info.id];let loc={};try{loc=JSON.parse(localStorage.getItem(KEY+"_stc_"+id)||"{}")}catch(e){}
+    let j={},x={};try{j=JSON.parse((my&&my.j)||"{}");x=JSON.parse((my&&my.x)||"{}")}catch(e){}
+    if(loc.at&&(!my||loc.at>(my.at||0))){j=loc.j||j;x=loc.x||x}
+    SK={lists:LS,mine,info,items,id,j,x,done:!!(my&&my.done),ok:!!(my&&my.ok),q:"",f:"all",cat:"",lim:150,t:null,name:""};setSync("☁ "+ME);stkSUI()}
   catch(e){screen(`<h2 style="margin-top:0">Access not given</h2><p><b>${esc(ME)}</b> has no access yet. Ask the owner to add you under Staff logins and publish the Rules.</p><button class="btn" onclick="logout()">Logout</button>`)}}
 const skCnt=()=>Object.values(SK.j).filter(v=>v!==""&&v!=null).length;
-function stkSUI(){if(!SK.info){$("app").innerHTML=`<div class="card empty" style="max-width:560px;margin:20px auto">No stock count list right now. The owner will send one.<p><button class="btn g" onclick="stockStaffStart()">Refresh</button></p></div>`;return}
+function stkSUI(){if(!SK.info){$("app").innerHTML=`<div style="max-width:560px;margin:0 auto">${SK.lists&&SK.lists.length?`<h2>Count these today</h2>${SK.lists.map(L=>{const m=SK.mine[L.id];return`<div class="card click" style="margin-top:8px" onclick="stockStaffStart('${jsq(L.id)}')"><b>${esc(L.title)}</b><div class="muted">${L.n} parts · asked ${fd(L.date)}</div>${m?`<span class="pill ${m.ok?"p-ok":m.done?"p-b":"p-w"}">${m.ok?"Accepted":m.done?"Submitted":"In progress"} · ${m.n||0}/${L.n}</span>`:`<span class="pill p-r">New – not started</span>`}</div>`}).join("")}`:`<div class="card empty" style="margin-top:20px">Nothing to count right now. The owner will send a list.</div>`}<p><button class="btn g" onclick="stockStaffStart()">↻ Refresh</button></p></div>`;return}
   const q=SK.q.trim().toLowerCase(),cats=[...new Set(SK.items.map(r=>r[2]).filter(Boolean))].sort();
   const A=SK.items.filter(r=>(!q||(r[0]+" "+r[1]).toLowerCase().includes(q))&&(!SK.cat||r[2]===SK.cat)&&(SK.f==="all"||(SK.f==="left"?!(r[0] in SK.j)||SK.j[r[0]]==="":(r[0] in SK.j)&&SK.j[r[0]]!=="")));
   const n=skCnt(),tot=SK.items.length,ro=SK.ok;
-  $("app").innerHTML=`<div style="max-width:640px;margin:0 auto"><div class="card"><h2 style="margin:0">${esc(SK.info.title)}</h2><div class="muted">${fd(SK.info.date)} · ${tot} parts</div>
+  $("app").innerHTML=`<div style="max-width:640px;margin:0 auto">${SK.lists.length>1?`<p style="margin:0 0 8px"><a href="#" onclick="stockStaffStart();return false">← All lists</a></p>`:""}<div class="card"><h2 style="margin:0">${esc(SK.info.title)}</h2><div class="muted">${fd(SK.info.date)} · ${tot} parts</div>
    <div style="background:#eee;border-radius:8px;height:10px;margin:10px 0"><div id="sk_bar" style="background:var(--green);height:10px;border-radius:8px;width:${tot?Math.round(n*100/tot):0}%"></div></div>
    <b id="sk_n">${n} of ${tot} counted</b> <span id="sk_s" class="muted"></span>
    ${ro?`<div class="note" style="margin-top:8px">✔ The owner has accepted this count. It cannot be changed now.</div>`:SK.done?`<div class="note" style="margin-top:8px">✔ Submitted. You can still correct a number until the owner accepts it.</div>`:""}
@@ -1608,7 +1616,7 @@ function startOwner(){
   },cErr));
   UNSUB.push(F.onSnapshot(C_("dupok"),snap=>{const o={};snap.docs.forEach(d=>{o[d.data().key]=1});D.dupok=o;if(!ready.k){ready.k=1;go1()}else refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("chal"),snap=>{const o={};snap.docs.forEach(d=>{const x=d.data();o[x.key]=x});D.chal=o;if(!ready.h){ready.h=1;go1()}else refresh()},cErr));
-  UNSUB.push(F.onSnapshot(C_("stkl"),snap=>{let info=null,items=[];snap.docs.map(d=>[d.id,d.data()]).sort((a,b)=>N(a[1].i)-N(b[1].i)).forEach(([id,x])=>{if(id==="info")info=x;else if(x&&x.j)try{items=items.concat(JSON.parse(x.j))}catch(e){}});D.stkl=info?{info,items}:null;if(BOOTED&&tab==="stk")refresh()},cErr));
+  UNSUB.push(F.onSnapshot(C_("stkl"),snap=>{const lists={};snap.docs.forEach(d=>{const x=d.data();if(!x||!x.id||!x.j||!x.title)return;let items=[];try{items=JSON.parse(x.j)}catch(e){}lists[x.id]={...x,items}});D.stkl={lists};if(BOOTED&&tab==="stk")refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("stkc"),snap=>{D.stkc=snap.docs.map(d=>d.data());if(BOOTED&&tab==="stk")refresh()},cErr));
   UNSUB.push(F.onSnapshot(R_("meta","staff"),d=>{D.staff=d.exists()?d.data():{};if(BOOTED&&tab==="stk")refresh()},cErr));
   UNSUB.push(F.onSnapshot(R_("meta","jr"),d=>{D.jr=d.exists()?d.data():{};if(BOOTED&&tab==="jr")refresh()},cErr));
