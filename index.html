@@ -11,9 +11,15 @@
 body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:15px}
 header{background:var(--red);color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5}
 header h1{font-size:19px;margin:0}header small{opacity:.85}
-nav{display:flex;gap:2px;overflow-x:auto;background:#fff;border-bottom:1px solid var(--line);padding:0 8px;position:sticky;top:52px;z-index:4}
-nav button{flex:none;border:0;background:none;padding:12px;font-size:14px;color:var(--mute);cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent}
-nav button.on{color:var(--red);border-bottom-color:var(--red);font-weight:600}
+nav{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:52px;z-index:4}
+nav .g1{display:flex;gap:6px;overflow-x:auto;padding:8px 10px 6px}
+nav .g1 button{flex:1 0 auto;min-width:92px;border:1px solid var(--line);background:#fafafb;border-radius:12px;padding:6px 10px;cursor:pointer;color:#333;font-size:13px;line-height:1.15;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav .g1 button .ic{font-size:20px}
+nav .g1 button.on{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+nav .g2{display:flex;gap:2px;overflow-x:auto;padding:0 8px;background:#fff7f7;border-top:1px solid var(--line)}
+nav .g2 button{flex:none;border:0;background:none;padding:9px 12px;font-size:14px;color:var(--mute);cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent}
+nav .g2 button.on{color:var(--red);border-bottom-color:var(--red);font-weight:600}
+nav .pill{font-size:11px;padding:1px 6px}
 main{max-width:1200px;margin:0 auto;padding:14px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px}
 .g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px}
@@ -168,7 +174,11 @@ function groupSum(a,kf,vf){const o={};a.forEach(x=>{const k=kf(x)||"Other";o[k]=
 /* ================= views ================= */
 const TABS={dash:"Dashboard",daily:"💰 Daily",fin:"Finance",veh:"Vehicles",svc:"Service",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",stk:"📦 Stock",money:"Money & Expenses",dbk:"📷 Day Book",ws:"🔧 Workshop",jr:"🎟 Joyride",att:"🕘 Attendance",oldb:"Old bikes",imp:"Import DMS files"};
 let tab=(()=>{try{const t=sessionStorage.getItem("de_rt");sessionStorage.removeItem("de_rt");return t||"dash"}catch(e){return"dash"}})();
-function nav(){const dn=dupScan().length;$("nav").innerHTML=Object.entries(dn?{...TABS,dup:"⚠ Duplicates"}:TABS).map(([k,v])=>`<button class="${k===tab?"on":""}" onclick="go('${k}')">${v}${k==="dup"?` <span class="pill p-r">${dn}</span>`:""}${k==="col"&&(pending().length+udPendN())?` <span class="pill p-r">${pending().length+udPendN()}</span>`:""}</button>`).join("")}
+const NAVG=[["home","🏠","Today",["dash","daily"]],["sale","🏍","Sales",["veh","dbk","fin","oldb"]],["work","🔧","Workshop",["ws","svc","jr","acc","wcl"]],["money","💰","Money",["money","col"]],["parts","📦","Parts & Stock",["stk","parts"]],["staff","👥","Staff",["att"]],["data","⬆","Import & check",["imp","dup"]]];
+const NAVL={dash:"Dashboard",daily:"💰 Daily money",fin:"Finance",veh:"Vehicles",svc:"Service bills",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",stk:"Stock",money:"Money & Expenses",dbk:"📷 Day Book",ws:"Workshop sheets",jr:"🎟 Joyride",att:"Attendance",oldb:"Old bikes",imp:"Import DMS files",dup:"⚠ Duplicates"};
+function nav(){const dn=dupScan().length,cn=pending().length+udPendN(),badge=k=>k==="dup"&&dn?` <span class="pill p-r">${dn}</span>`:k==="col"&&cn?` <span class="pill p-r">${cn}</span>`:"";
+  const G=NAVG.map(g=>[g[0],g[1],g[2],g[3].filter(k=>k!=="dup"||dn)]),cur=G.find(g=>g[3].includes(tab))||G[0];
+  $("nav").innerHTML=`<div class="g1">${G.map(([id,ic,l,L])=>`<button class="${id===cur[0]?"on":""}" onclick="go('${L.includes(tab)?tab:L[0]}')"><span class="ic">${ic}</span><span>${l}${L.map(badge).join("")}</span></button>`).join("")}</div>${cur[3].length>1?`<div class="g2">${cur[3].map(k=>`<button class="${k===tab?"on":""}" onclick="go('${k}')">${NAVL[k]||TABS[k]||k}${badge(k)}</button>`).join("")}</div>`:""}`}
 let _jump=false;function go(t){tab=t;nav();_jump=true;try{render()}finally{_jump=false}scrollTo(0,0)}
 function render(){if(tab==="dup"&&!dupScan().length)tab="dash";const M={dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,stk,money,dbk,ws:wsk,jr:jry,att,oldb,imp};if(!M[tab])tab="dash";M[tab]()}
 const noData=()=>!Object.keys(D.vs).length&&!Object.keys(D.sv).length&&!Object.keys(D.vp).length;
