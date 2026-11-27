@@ -58,7 +58,7 @@ dialog .bd{padding:16px;max-height:80vh;overflow:auto}
 <body>
 <header>
   <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data</small></div>
-  <div style="text-align:right"><span id="sync" style="font-size:12px;opacity:.9;margin-right:6px"></span><button class="btn g s hide-off" onclick="backup()">⬇ Backup</button> <button class="btn g s" onclick="$('restoreFile').click()">⬆ Restore</button><input type="file" id="restoreFile" accept=".json" hidden onchange="restore(this)"> <button class="btn g s" id="logoutBtn" style="display:none" onclick="logout()">Logout</button></div>
+  <div style="text-align:right"><span id="sync" style="font-size:12px;opacity:.9;margin-right:6px"></span><button class="btn g s" id="refreshBtn" title="Get the newest app and data" onclick="appRefresh()">↻ Refresh</button> <button class="btn g s hide-off" onclick="backup()">⬇ Backup</button> <button class="btn g s" onclick="$('restoreFile').click()">⬆ Restore</button><input type="file" id="restoreFile" accept=".json" hidden onchange="restore(this)"> <button class="btn g s" id="logoutBtn" style="display:none" onclick="logout()">Logout</button></div>
 </header>
 <nav id="nav"></nav>
 <main id="app"></main>
@@ -161,10 +161,10 @@ function groupSum(a,kf,vf){const o={};a.forEach(x=>{const k=kf(x)||"Other";o[k]=
 
 /* ================= views ================= */
 const TABS={dash:"Dashboard",daily:"Daily",fin:"Finance",veh:"Vehicles",svc:"Service",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",stk:"📦 Stock",money:"Money & Expenses",dbk:"📷 Day Book",ws:"🔧 Workshop",jr:"🎟 Joyride",att:"🕘 Attendance",oldb:"Old bikes",imp:"Import DMS files"};
-let tab="dash";
+let tab=(()=>{try{const t=sessionStorage.getItem("de_rt");sessionStorage.removeItem("de_rt");return t||"dash"}catch(e){return"dash"}})();
 function nav(){const dn=dupScan().length;$("nav").innerHTML=Object.entries(dn?{...TABS,dup:"⚠ Duplicates"}:TABS).map(([k,v])=>`<button class="${k===tab?"on":""}" onclick="go('${k}')">${v}${k==="dup"?` <span class="pill p-r">${dn}</span>`:""}${k==="col"&&pending().length?` <span class="pill p-r">${pending().length}</span>`:""}</button>`).join("")}
 function go(t){tab=t;nav();render();scrollTo(0,0)}
-function render(){if(tab==="dup"&&!dupScan().length)tab="dash";({dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,stk,money,dbk,ws:wsk,jr:jry,att,oldb,imp})[tab]()}
+function render(){if(tab==="dup"&&!dupScan().length)tab="dash";const M={dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,stk,money,dbk,ws:wsk,jr:jry,att,oldb,imp};if(!M[tab])tab="dash";M[tab]()}
 const noData=()=>!Object.keys(D.vs).length&&!Object.keys(D.sv).length&&!Object.keys(D.vp).length;
 
 function dash(){
@@ -225,7 +225,7 @@ function dash(){
 
 /* ---------- STAFF MODE: finance entry only ---------- */
 let STAFF=false,SF=[];
-function staffStart(){STAFF=true;try{localStorage.removeItem(KEY)}catch(e){}D=EMPTY();$("nav").innerHTML="";document.querySelectorAll("header .btn.g").forEach(b=>{if(b.id!=="logoutBtn")b.style.display="none"});
+function staffStart(){STAFF=true;try{localStorage.removeItem(KEY)}catch(e){}D=EMPTY();$("nav").innerHTML="";document.querySelectorAll("header .btn.g").forEach(b=>{if(b.id!=="logoutBtn"&&b.id!=="refreshBtn")b.style.display="none"});
   document.querySelector("header small").textContent="Finance entry";
   const {F}=FB;UNSUB.push(F.onSnapshot(F.query(C_("fin"),F.where("by","==",ME)),snap=>{SF=snap.docs.map(d=>d.data()).sort((a,b)=>(b.date||"").localeCompare(a.date||""));setSync("☁ "+ME);staffUI()},e=>{UNSUB.forEach(u=>{try{u()}catch(x){}});UNSUB=[];screen(`<h2 style="margin-top:0">Access not given</h2><p><b>${esc(ME)}</b> has no access yet. Ask the owner to add your email under Staff in the Firebase Rules.</p><button class="btn" onclick="logout()">Logout</button>`)}))}
 function staffUI(eid){if(dlg.open)return;const e=SF.find(x=>x.id===eid)||{date:today()};
@@ -1365,10 +1365,11 @@ function jry(){const r=range(),J=jrData(r);
 async function jrRate(v){D.jr={...(D.jr||{}),rate:N(v)};save();await dbCommit([["set","meta","jr",D.jr]]);jry()}
 
 /* ================= STOCK: DMS stock list · physical count by staff · staff logins ================= */
-let STKSEL=new Set(),stkLS="",stkV="list",stkQ="",stkSort="val",stkMin="",stkMax="",stkCat="",stkCS="all",stkF="diff",stkLim=300;
+let stkDiff=false,STKSEL=new Set(),stkLS="",stkV="list",stkQ="",stkSort="val",stkMin="",stkMax="",stkCat="",stkCS="all",stkF="diff",stkLim=300;
 const STK_BANDS=[[10000,0,"₹10,000 +"],[5000,10000,"₹5,000 – 10,000"],[1000,5000,"₹1,000 – 5,000"],[500,1000,"₹500 – 1,000"],[100,500,"₹100 – 500"],[0,100,"Below ₹100"]];
 const STK_KEYS=["id","list","date","by","name","at","n","done","j","x"];
 function stkItems(){const m={};(D.stock||[]).forEach(r=>{const k=String(r.part||"").trim();if(!k)return;const o=m[k]||(m[k]={part:k,name:r.name||"",cat:r.cat||"",qty:0,val:0});o.qty+=N(r.qty);o.val+=N(r.val)});
+  Object.entries((D.phys&&D.phys.j)||{}).forEach(([p,v])=>{if(!m[p]&&v)m[p]={part:p,name:v[2]||"",cat:v[3]||"",qty:0,val:0,notDMS:true}});
   return Object.values(m).map(o=>({...o,price:o.qty?o.val/o.qty:0}))}
 function stkFilter(A){const q=stkQ.trim().toLowerCase(),mn=N(stkMin),mx=N(stkMax);
   A=A.filter(x=>(!q||(x.part+" "+x.name).toLowerCase().includes(q))&&(!stkCat||x.cat===stkCat)&&(stkMin===""||x.price>=mn)&&(stkMax===""||x.price<mx));
@@ -1376,19 +1377,20 @@ function stkFilter(A){const q=stkQ.trim().toLowerCase(),mn=N(stkMin),mx=N(stkMax
   return A.sort(f)}
 const q2=v=>Math.round(N(v)*100)/100;
 const stkLists=()=>Object.values((D.stkl&&D.stkl.lists)||{}).sort((a,b)=>(b.at||0)-(a.at||0));
+const stkPd=x=>{const p=stkPhys(x.part);return p&&Math.abs(N(p[0])-x.qty)>=0.5};
 const stkPhys=p=>(D.phys&&D.phys.j&&D.phys.j[p])||null;
 function stkSet(k,v){if(k==="stkCat")stkCat=v;else if(k==="stkMin")stkMin=v;else if(k==="stkMax")stkMax=v;else if(k==="stkSort")stkSort=v;stkLim=300;stk()}
 const stkWho=c=>((D.staff&&D.staff.names)||{})[c.by]||c.name||c.by;
 function stk(){
   const seg=`<div class="row"><span class="seg">${[["list","Stock today"],["count","Physical count"],["staff","Staff logins"]].map(([v,l])=>`<button class="${stkV===v?"on":""}" onclick="stkV='${v}';stk()">${l}</button>`).join("")}</span></div>`;
   $("app").innerHTML=seg+({list:stkListHtml,count:stkCountHtml,staff:stkStaffHtml}[stkV]||stkListHtml)()}
-function stkListHtml(){const all=stkItems().filter(x=>x.qty>0),A=stkFilter(all),cats=[...new Set(all.map(x=>x.cat).filter(Boolean))].sort();
+function stkListHtml(){const all=stkItems().filter(x=>x.qty>0||stkPhys(x.part)),A=stkFilter(all).filter(x=>!stkDiff||stkPd(x)),cats=[...new Set(all.map(x=>x.cat).filter(Boolean))].sort();
   const mt=D.meta&&D.meta.stock;
   if(!all.length)return`<div class="card empty" style="margin-top:12px">No parts stock yet. Export the <b>Parts Stock Report</b> from DMS and add it in <a href="#" onclick="go('imp');return false">Import DMS files</a>.</div>`;
   const bands=STK_BANDS.map(([lo,hi,l])=>{const B=all.filter(x=>x.price>=lo&&(!hi||x.price<hi));return{lo,hi,l,n:B.length,pcs:sum(B,x=>x.qty),val:sum(B,x=>x.val)}});
   const on=b=>String(stkMin)===String(b.lo)&&String(stkMax)===String(b.hi||"");
-  return`<div class="note" style="margin-top:10px">DMS stock as of <b>${mt?fd(mt.at):"–"}</b>${mt&&mt.file?` <span class="muted">(${esc(mt.file)})</span>`:""}. To bring it up to date, export today's <b>Parts Stock Report</b> from DMS and add it in <a href="#" onclick="go('imp');return false">Import DMS files</a>.${D.phys&&D.phys.date?` · Last physical count accepted: <b>${fd(D.phys.date)}</b>`:""}</div>
-  <div class="grid" style="margin-top:10px"><div class="card stat"><div class="l">Part nos. in stock</div><div class="n">${all.length}</div><div class="s">${Math.round(sum(all,x=>x.qty))} pcs</div></div><div class="card stat"><div class="l">Stock value</div><div class="n">${lakh(sum(all,x=>x.val))}</div></div><div class="card stat"><div class="l">Shown below</div><div class="n">${A.length}</div><div class="s">${Math.round(sum(A,x=>x.qty))} pcs · ${lakh(sum(A,x=>x.val))}</div></div></div>
+  return`<div class="note" style="margin-top:10px">DMS stock as of <b>${mt?fd(mt.at):"–"}</b>${mt&&mt.file?` <span class="muted">(${esc(mt.file)})</span>`:""}. To bring it up to date, export today's <b>Parts Stock Report</b> from DMS and add it in <a href="#" onclick="go('imp');return false">Import DMS files</a>.${D.phys&&D.phys.date?` · Last physical update: <b>${fd(D.phys.date)}</b>`:""}</div>
+  <div class="grid" style="margin-top:10px"><div class="card stat"><div class="l">Part nos. in stock</div><div class="n">${all.length}</div><div class="s">${Math.round(sum(all,x=>x.qty))} pcs</div></div><div class="card stat"><div class="l">Stock value</div><div class="n">${lakh(sum(all,x=>x.val))}</div></div>${(()=>{const P=all.filter(x=>stkPhys(x.part)),sh=P.filter(x=>stkPd(x)&&N(stkPhys(x.part)[0])<x.qty),ex=P.filter(x=>stkPd(x)&&N(stkPhys(x.part)[0])>x.qty);return`<div class="card stat click" onclick="stkDiff=!stkDiff;stk()"><div class="l">Physical checked</div><div class="n">${P.length}</div><div class="s"><span class="neg">${sh.length} short ${rs(sum(sh,x=>(x.qty-N(stkPhys(x.part)[0]))*x.price))}</span> · ${ex.length} extra</div></div>`})()}<div class="card stat"><div class="l">Shown below</div><div class="n">${A.length}</div><div class="s">${Math.round(sum(A,x=>x.qty))} pcs · ${lakh(sum(A,x=>x.val))}</div></div></div>
   <div class="card" style="margin-top:10px"><h3 style="margin-top:0">By price of one piece <span class="muted" style="font-weight:400;font-size:13px">(click to show only that range)</span></h3>
   ${table(["Price of one piece","Part nos.","Pieces","Value"],bands.map(b=>[`<a href="#" onclick="stkMin='${b.lo}';stkMax='${b.hi||""}';stkLim=300;stk();return false">${on(b)?"<b>▶ "+b.l+"</b>":b.l}</a>`,{n:b.n},{n:Math.round(b.pcs)},{n:rs(b.val)}]))}</div>
   <div class="row" style="margin-top:12px;flex-wrap:wrap;gap:6px"><input placeholder="Search part no. / name" value="${esc(stkQ)}" oninput="stkQ=this.value;stkLim=300;stk();refocus(this)">
@@ -1397,11 +1399,19 @@ function stkListHtml(){const all=stkItems().filter(x=>x.qty>0),A=stkFilter(all),
    <select onchange="stkSet('stkSort',this.value)">${[["val","Sort: highest total value"],["price","Sort: costliest piece first"],["priceLo","Sort: cheapest piece first"],["qty","Sort: most pieces"],["name","Sort: name A–Z"]].map(([v,l])=>`<option value="${v}" ${v===stkSort?"selected":""}>${l}</option>`).join("")}</select>
    ${stkQ||stkCat||stkMin!==""||stkMax!==""?`<button class="btn g s" onclick="stkQ='';stkCat='';stkMin='';stkMax='';stkLim=300;stk()">Clear filters</button>`:""}
    <button class="btn g s" onclick="stkXls()">⬇ Excel</button></div>
+  <div class="card" style="margin-top:10px"><b>Found something different on the shelf?</b> <span class="muted">Type the real (physical) quantity in the <b>Physical</b> box of that part below — it saves by itself. A part that is on the shelf but not in DMS can be added here:</span>
+   <div class="row" style="margin-top:6px;flex-wrap:wrap"><input id="ph_p" placeholder="Part no." style="width:160px"><input id="ph_n" placeholder="Name"><input id="ph_q" type="number" inputmode="decimal" placeholder="Pieces" style="width:90px"><button class="btn s" onclick="stkPhysAdd()">＋ Add</button>
+   <label style="margin:0 0 0 auto"><input type="checkbox" style="width:auto" ${stkDiff?"checked":""} onchange="stkDiff=this.checked;stk()"> Show only parts where physical ≠ DMS</label></div></div>
   <div class="card" style="margin-top:10px;background:#f6f9ff"><b>Ask staff how many are there today:</b> tick the parts below (or tick none to send everything shown), then press the button. The employee sees only part no. + name and types how many pieces are on the shelf; you see the answer in <b>Physical count</b>.
    <div class="row" style="margin-top:6px"><button class="btn" onclick="stkPublish()">📋 Ask staff to count ${STKSEL.size?`${STKSEL.size} ticked parts`:`all ${A.length} parts shown`}</button>${STKSEL.size?`<button class="btn g s" onclick="STKSEL.clear();stk()">Untick all</button>`:""}</div></div>
-  ${table([`<input type="checkbox" style="width:auto" title="Tick all shown" ${A.length&&A.slice(0,stkLim).every(x=>STKSEL.has(x.part))?"checked":""} onchange="stkTickAll(this.checked)">`,"Part no.","Name","Category","DMS qty","Price / piece","Value",...(D.phys&&D.phys.j?["Physical (counted)"]:[])],A.slice(0,stkLim).map(x=>{const p=stkPhys(x.part);return[`<input type="checkbox" style="width:auto" ${STKSEL.has(x.part)?"checked":""} onchange="stkTick('${jsq(x.part)}',this.checked)">`,`<b>${esc(x.part)}</b>`,esc(x.name),`<span class="muted">${esc(x.cat)}</span>`,{n:q2(x.qty)},{n:rs(x.price)},{n:rs(x.val)},...(D.phys&&D.phys.j?[{n:p?`${p[0]}${q2(p[0])!==q2(x.qty)?` <span class="pill ${p[0]<x.qty?"p-r":"p-w"}">${p[0]-x.qty>0?"+":""}${q2(p[0]-x.qty)}</span>`:""}<div class="muted" style="font-size:11px">${fd(p[1])}</div>`:"–"}]:[])]}))}
+  ${table([`<input type="checkbox" style="width:auto" title="Tick all shown" ${A.length&&A.slice(0,stkLim).every(x=>STKSEL.has(x.part))?"checked":""} onchange="stkTickAll(this.checked)">`,"Part no.","Name","Category","DMS qty","Price / piece","Value","Physical","Difference"],A.slice(0,stkLim).map(x=>{const p=stkPhys(x.part);return[`<input type="checkbox" style="width:auto" ${STKSEL.has(x.part)?"checked":""} onchange="stkTick('${jsq(x.part)}',this.checked)">`,`<b>${esc(x.part)}</b>`,esc(x.name),`<span class="muted">${esc(x.cat)}</span>`,{n:x.notDMS?`<span class="pill p-w">not in DMS</span>`:q2(x.qty)},{n:x.qty?rs(x.price):""},{n:x.qty?rs(x.val):""},{n:`<input type="number" inputmode="decimal" min="0" style="width:80px;text-align:right" value="${p?esc(p[0]):""}" placeholder="–" onchange="stkPhysSet('${jsq(x.part)}',this.value)">${p?`<div class="muted" style="font-size:11px">${fd(p[1])}${p[4]?" · "+esc(p[4]):""}</div>`:""}`},{n:p?(Math.abs(N(p[0])-x.qty)<0.5?`<span class="pill p-ok">✔</span>`:`<span class="pill ${N(p[0])<x.qty?"p-r":"p-w"}">${N(p[0])>x.qty?"+":""}${q2(N(p[0])-x.qty)}</span><div class="${N(p[0])<x.qty?"neg":""}" style="font-size:11px">${x.price?rs((N(p[0])-x.qty)*x.price):""}</div>`):""}]}))}
   ${A.length>stkLim?`<p><button class="btn g s" onclick="stkLim+=500;stk()">Show more (${A.length-stkLim} more)</button></p>`:""}`}
 function stkXls(){const A=stkFilter(stkItems().filter(x=>x.qty>0));const ws=XLSX.utils.aoa_to_sheet([["Part no.","Name","Category","DMS qty","Price / piece","Value"],...A.map(x=>[x.part,x.name,x.cat,x.qty,Math.round(x.price*100)/100,Math.round(x.val)])]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Stock");XLSX.writeFile(wb,`parts-stock-${today()}.xlsx`)}
+async function stkPhysSet(p,v,name,cat){const j={...((D.phys&&D.phys.j)||{})},old=j[p];v=String(v).trim();
+  if(v===""){if(!old)return;delete j[p]}else j[p]=[q2(v),today(),name!==undefined?name:(old&&old[2])||"",cat!==undefined?cat:(old&&old[3])||"",String(ME).split("@")[0]];
+  D.phys={...(D.phys||{}),date:today(),at:Date.now(),by:ME,j};save();await dbCommit([["set","meta","phys",D.phys]]);stk()}
+async function stkPhysAdd(){const p=$("ph_p").value.trim().toUpperCase(),n=$("ph_n").value.trim(),q=$("ph_q").value.trim();if(!p||q==="")return alert("Enter the part no. and the pieces");
+  const inDMS=stkItems().find(x=>x.part===p&&!x.notDMS);await stkPhysSet(p,q,inDMS?undefined:(n||"(added)"),inDMS?undefined:"Added – not in DMS");stkQ=p;stk()}
 function stkTick(p,on){if(on)STKSEL.add(p);else STKSEL.delete(p);stk()}
 function stkTickAll(on){stkFilter(stkItems().filter(x=>x.qty>0)).slice(0,stkLim).forEach(x=>on?STKSEL.add(x.part):STKSEL.delete(x.part));stk()}
 async function stkPublish(){const all=stkItems(),A=STKSEL.size?all.filter(x=>STKSEL.has(x.part)):stkFilter(all.filter(x=>x.qty>0));if(!A.length)return alert("No parts in the list");if(!FB)return alert("Login is needed to send the list");
@@ -1416,7 +1426,7 @@ function stkMap(cs){const m={},x={};cs.forEach(c=>{let j={},e={};try{j=JSON.pars
 function stkCompare(cs,L){const {m,x}=stkMap(cs),S={};stkItems().forEach(s=>S[s.part]=s);
   const parts=new Set(Object.keys(m)),nm={};if(L&&L.items)L.items.forEach(r=>{parts.add(r[0]);nm[r[0]]=r[1]});
   return[...parts].map(p=>{const s=S[p],sys=s?s.qty:0,price=s?s.price:0,cnt=p in m?m[p]:null,d=cnt===null?null:q2(cnt-sys);
-    return{part:p,name:(s&&s.name)||nm[p]||x[p]||"",cat:s?s.cat:"",sys:q2(sys),price,cnt,d,dv:d===null||Math.abs(d)<0.5?0:d*price,st:cnt===null?"nc":Math.abs(d)<0.5?"ok":d<0?"short":"extra",notDMS:!s}}).sort((a,b)=>Math.abs(b.dv)-Math.abs(a.dv)||a.part.localeCompare(b.part))}
+    return{part:p,name:(s&&s.name)||nm[p]||x[p]||"",cat:s?s.cat:"",sys:q2(sys),price,cnt,d,dv:d===null||Math.abs(d)<0.5?0:d*price,st:cnt===null?"nc":Math.abs(d)<0.5?"ok":d<0?"short":"extra",notDMS:!s||!!s.notDMS}}).sort((a,b)=>Math.abs(b.dv)-Math.abs(a.dv)||a.part.localeCompare(b.part))}
 function stkCountHtml(){const LS=stkLists();
   if(!LS.length)return`<div class="card empty" style="margin-top:12px">Nothing asked yet. In <b>Stock today</b>, tick the parts (or filter them, e.g. price from ₹1,000) and press <b>Ask staff to count</b>. Add the employee's login in <b>Staff logins</b>.</div>`;
   if(!LS.some(l=>l.id===stkLS))stkLS=(LS.find(l=>l.open!==false)||LS[0]).id;const L=LS.find(l=>l.id===stkLS),C=stkCounts(L.id);
@@ -1468,7 +1478,7 @@ async function stkMakeLogin(){const n=$("sk_n").value.trim(),e=$("sk_e").value.t
 async function stkStaffRm(e){if(!confirm(`Remove ${e} from stock-count staff?\n(Then publish the new Rules text so the login stops working.)`))return;const S={...(D.staff||{})};S.stock=(S.stock||[]).filter(x=>x!==e);await stkStaffSave(S);stk()}
 /* ---- employee (stock staff) screen ---- */
 let SK=null;
-async function stockStaffStart(pick){STAFF="stock";try{localStorage.removeItem(KEY)}catch(e){}D=EMPTY();$("nav").innerHTML="";document.querySelectorAll("header .btn.g").forEach(b=>{if(b.id!=="logoutBtn")b.style.display="none"});
+async function stockStaffStart(pick){STAFF="stock";try{localStorage.removeItem(KEY)}catch(e){}D=EMPTY();$("nav").innerHTML="";document.querySelectorAll("header .btn.g").forEach(b=>{if(b.id!=="logoutBtn"&&b.id!=="refreshBtn")b.style.display="none"});
   document.querySelector("header small").textContent="Stock count";screen(`<div class="empty">⏳ Loading…</div>`);
   try{const {F}=FB,snap=await F.getDocs(C_("stkl"));const LS=snap.docs.map(d=>d.data()).filter(x=>x&&x.id&&x.j&&x.title&&x.open!==false).sort((a,b)=>(b.at||0)-(a.at||0));
     const mine={};await Promise.all(LS.map(async L=>{const id=sid(L.id+"_"+ME);try{const d=await F.getDoc(R_("stkc",id));if(d.exists())mine[L.id]=d.data()}catch(e){}}));
@@ -1571,6 +1581,10 @@ const SHOP="deepanshu-enterprises",FBV="12.19.0",DMSK=["vs","vp","sv","pp","ps",
 let BOOTED=false,FB=null,ME="",VER=null,PARTS={},UNSUB=[];
 const sid=k=>String(k).replace(/[\/\s]/g,"_");
 function screen(html){$("nav").innerHTML="";$("app").innerHTML=`<div class="card" style="max-width:440px;margin:40px auto">${html}</div>`}
+async function appRefresh(){const b=$("refreshBtn");if(b){b.disabled=true;b.textContent="⏳"}setSync("⏳ Refreshing…");
+  try{sessionStorage.setItem("de_rt",tab||"")}catch(e){}
+  try{await fetch(location.pathname,{cache:"reload"})}catch(e){}
+  location.reload()}
 function setSync(t){const e=$("sync");if(e)e.textContent=t}
 async function boot(){
   if(!fbCfg())return setup();
