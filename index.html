@@ -2007,6 +2007,19 @@ function backup(){dl(new Blob([JSON.stringify(D)],{type:"application/json"}),`de
 function restore(inp){const fl=inp.files[0];if(!fl)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.vs||!x.sv)throw 0;if(confirm("Replace all data (for everyone) with this backup?"))restoreAll(x)}catch(e){alert("Not a valid backup file")}};r.readAsText(fl);inp.value=""}
 const dlg=$("dlg");
 (function(){const fix=()=>{const h=document.querySelector("header"),n=$("nav");if(h&&n&&n.style)n.style.top=h.offsetHeight+"px"};try{fix();window.addEventListener("resize",fix);setTimeout(fix,500)}catch(e){}})();
+
+/* ---------- duplicate file check for every upload ---------- */
+async function fileHash(f){try{const b=await f.arrayBuffer();if(crypto&&crypto.subtle){const h=await crypto.subtle.digest("SHA-256",b);return[...new Uint8Array(h)].slice(0,16).map(x=>x.toString(16).padStart(2,"0")).join("")}}catch(e){}return"n"+nz(f.name)+"_"+f.size+"_"+(f.lastModified||0)}
+async function upSeen(h){let x=null;try{x=JSON.parse(localStorage.getItem("de_up_"+h)||"null")}catch(e){}if(!x&&FB&&!STAFF){try{const d=await FB.F.getDoc(R_("upl",h));if(d.exists())x=d.data()}catch(e){}}return x}
+function upMark(h,f,where){const o={h,name:f.name||"",size:f.size||0,where,at:Date.now(),by:ME||""};try{localStorage.setItem("de_up_"+h,JSON.stringify(o))}catch(e){}if(FB&&!STAFF)FB.F.setDoc(R_("upl",h),o).catch(()=>{})}
+async function dupFilter(files,where){const out=[],seen=new Set();for(const f of [...(files||[])]){const h=await fileHash(f);
+    if(seen.has(h)){alert(`⚠ "${f.name}" was chosen twice — it is used only once.`);continue}seen.add(h);
+    const x=await upSeen(h);if(x){const when=new Date(x.at),t=`${fd(iso(when))} ${when.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}`;
+      if(!confirm(`⚠ DUPLICATE FILE\n\n"${f.name}" was already uploaded on ${t}${x.where?` (${x.where})`:""}${x.by&&x.by!==ME?` by ${x.by}`:""}.\n\nIt will NOT be uploaded again.\n\nPress Cancel (recommended).\nPress OK only if you really want to upload it again.`))continue}
+    upMark(h,f,where);out.push(f)}return out}
+if(typeof window!=="undefined")(function(){const W={importFiles:"Import DMS files",atPhoto:"Attendance register photo",dbPhoto:"Day Book photo",regPhoto:"Finance register photo",wsPhoto:"Workshop photo"},I={wsExcel:"Workshop Excel",xlOpen:"Sales Excel",bankFile:"Bank statement"};
+  Object.entries(W).forEach(([n,where])=>{const f=window[n];if(typeof f!=="function")return;window[n]=async function(files,...a){const L=await dupFilter(files,where);if(!L.length)return;return f.call(this,L,...a)}});
+  Object.entries(I).forEach(([n,where])=>{const f=window[n];if(typeof f!=="function")return;window[n]=async function(inp,...a){const fl=inp&&inp.files&&inp.files[0];if(!fl)return f.call(this,inp,...a);const L=await dupFilter([fl],where);if(!L.length){try{inp.value=""}catch(e){}return}return f.call(this,inp,...a)}})})();
 /* keep the page where it is when a screen is redrawn (no jump to top while marking attendance etc.) */
 (function(){let depth=0;const inner=()=>[...document.querySelectorAll("#app .tw, #app [data-keep]")];
   const keep=f=>function(...a){if(depth)return f.apply(this,a);depth++;const y=window.scrollY||0,T=inner().map(e=>[e.scrollTop,e.scrollLeft]);let r;
