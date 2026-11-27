@@ -169,7 +169,7 @@ function groupSum(a,kf,vf){const o={};a.forEach(x=>{const k=kf(x)||"Other";o[k]=
 const TABS={dash:"Dashboard",daily:"💰 Daily",fin:"Finance",veh:"Vehicles",svc:"Service",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",stk:"📦 Stock",money:"Money & Expenses",dbk:"📷 Day Book",ws:"🔧 Workshop",jr:"🎟 Joyride",att:"🕘 Attendance",oldb:"Old bikes",imp:"Import DMS files"};
 let tab=(()=>{try{const t=sessionStorage.getItem("de_rt");sessionStorage.removeItem("de_rt");return t||"dash"}catch(e){return"dash"}})();
 function nav(){const dn=dupScan().length;$("nav").innerHTML=Object.entries(dn?{...TABS,dup:"⚠ Duplicates"}:TABS).map(([k,v])=>`<button class="${k===tab?"on":""}" onclick="go('${k}')">${v}${k==="dup"?` <span class="pill p-r">${dn}</span>`:""}${k==="col"&&(pending().length+udPendN())?` <span class="pill p-r">${pending().length+udPendN()}</span>`:""}</button>`).join("")}
-function go(t){tab=t;nav();render();scrollTo(0,0)}
+let _jump=false;function go(t){tab=t;nav();_jump=true;try{render()}finally{_jump=false}scrollTo(0,0)}
 function render(){if(tab==="dup"&&!dupScan().length)tab="dash";const M={dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,stk,money,dbk,ws:wsk,jr:jry,att,oldb,imp};if(!M[tab])tab="dash";M[tab]()}
 const noData=()=>!Object.keys(D.vs).length&&!Object.keys(D.sv).length&&!Object.keys(D.vp).length;
 
@@ -1986,6 +1986,9 @@ function dl(blob,name){const a=document.createElement("a");a.href=URL.createObje
 function backup(){dl(new Blob([JSON.stringify(D)],{type:"application/json"}),`deepanshu-enterprises-backup-${today()}.json`)}
 function restore(inp){const fl=inp.files[0];if(!fl)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.vs||!x.sv)throw 0;if(confirm("Replace all data (for everyone) with this backup?"))restoreAll(x)}catch(e){alert("Not a valid backup file")}};r.readAsText(fl);inp.value=""}
 const dlg=$("dlg");
+/* keep the page where it is when a screen is redrawn (no jump to top while marking attendance etc.) */
+(function(){const keep=f=>function(...a){const y=window.scrollY||0,r=f.apply(this,a);if(!_jump&&y){scrollTo(0,y);requestAnimationFrame(()=>{if(Math.abs((window.scrollY||0)-y)>2)scrollTo(0,y)})}return r};
+  ["render","att","wsk","stk","dbk","daily","jry","money","oldb","fin","veh","svc","acc","col","parts","dash","imp","wcl"].forEach(n=>{try{if(typeof window[n]==="function")window[n]=keep(window[n])}catch(e){}})})();
 boot();
 </script>
 </body>
