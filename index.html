@@ -64,7 +64,7 @@ dialog .bd{padding:16px;max-height:80vh;overflow:auto}
 </head>
 <body>
 <header>
-  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data</small></div>
+  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span style="opacity:.75">v 27 Nov 5:50 PM</span></small></div>
   <div style="text-align:right"><span id="sync" style="font-size:12px;opacity:.9;margin-right:6px"></span><button class="btn g s" id="refreshBtn" title="Get the newest app and data" onclick="appRefresh()">↻ Refresh</button> <button class="btn g s hide-off" onclick="backup()">⬇ Backup</button> <button class="btn g s" onclick="$('restoreFile').click()">⬆ Restore</button><input type="file" id="restoreFile" accept=".json" hidden onchange="restore(this)"> <button class="btn g s" id="logoutBtn" style="display:none" onclick="logout()">Logout</button></div>
 </header>
 <nav id="nav"></nav>
@@ -80,13 +80,13 @@ try{const s=localStorage.getItem(KEY);if(s)D=Object.assign(EMPTY(),JSON.parse(s)
 function save(){try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){alert("Browser storage is full or blocked. Take a Backup file.")}}
 const $=id=>document.getElementById(id);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-const iso=d=>{const z=new Date(d.getTime()-d.getTimezoneOffset()*6e4);return z.toISOString().slice(0,10)};
+const iso=d=>{if(!(d instanceof Date)||isNaN(d))return"";const z=new Date(d.getTime()-d.getTimezoneOffset()*6e4);return z.toISOString().slice(0,10)};
 const today=()=>iso(new Date());
 const NN=v=>{const t=String(v??"").trim();return /-$/.test(t)?-N(t.slice(0,-1)):N(t)};
 const N=v=>{if(typeof v==="number")return v;const x=parseFloat(String(v??"").replace(/[₹,\s]/g,""));return isNaN(x)?0:x};
 const rs=n=>(n<0?"-":"")+"₹"+Math.round(Math.abs(Number(n)||0)).toLocaleString("en-IN");
 const lakh=n=>Math.abs(n)>=1e5?(n<0?"-":"")+"₹"+(Math.abs(n)/1e5).toFixed(2)+" L":rs(n);
-const fd=d=>d?new Date(d+"T00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"2-digit"}):"";
+const fd=d=>d&&!isNaN(new Date(String(d).slice(0,10)+"T00:00"))?new Date(String(d).slice(0,10)+"T00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"2-digit"}):"";
 const diff=d=>Math.round((new Date(today()+"T00:00")-new Date(d+"T00:00"))/864e5);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const jsq=s=>esc(String(s??"").replace(/\\/g,"\\\\").replace(/'/g,"\\'").replace(/[\r\n]/g," "));
@@ -181,7 +181,8 @@ function nav(){const dn=dupScan().length,cn=pending().length+udPendN(),tb=(D.dbk
   const G=NAVG.map(g=>[g[0],g[1],g[2],g[3].filter(k=>k!=="dup"||dn)]),cur=G.find(g=>g[3].includes(tab))||G[0];
   $("nav").innerHTML=`<div class="g1">${G.map(([id,ic,l,L])=>`<button class="${id===cur[0]?"on":""}" onclick="go('${L.includes(tab)?tab:L[0]}')"><span class="ic">${ic}</span><span>${l}${L.map(badge).join("")}</span></button>`).join("")}</div>${cur[3].length>1?`<div class="g2">${cur[3].map(k=>`<button class="${k===tab?"on":""}" onclick="go('${k}')">${NAVL[k]||TABS[k]||k}${badge(k)}</button>`).join("")}</div>`:""}`}
 let _jump=false;function go(t){tab=t;nav();_jump=true;try{render()}finally{_jump=false}scrollTo(0,0)}
-function render(){if(tab==="dup"&&!dupScan().length)tab="dash";const M={ho:()=>{$("app").innerHTML=hoHtml()},rep,dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,stk,money,dbk,ws:wsk,jr:jry,att,oldb,imp};if(!M[tab])tab="dash";M[tab]()}
+function render(){try{render0()}catch(e){console.error(e);const a=$("app");if(a)a.innerHTML=`<div class="card" style="margin-top:12px;border-color:var(--red)"><h3 style="margin-top:0">⚠ This page could not be shown</h3><p>Please send a screenshot of this box.</p><pre style="white-space:pre-wrap;font-size:12px;background:#fafafa;padding:8px;border-radius:6px">${esc(tab+": "+(e&&e.message)+"\n"+String(e&&e.stack||"").split("\n").slice(0,4).join("\n"))}</pre><button class="btn" onclick="go('dash')">Go to Dashboard</button></div>`}}
+function render0(){if(tab==="dup"&&!dupScan().length)tab="dash";const M={ho:()=>{$("app").innerHTML=hoHtml()},rep,dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,stk,money,dbk,ws:wsk,jr:jry,att,oldb,imp};if(!M[tab])tab="dash";M[tab]()}
 const noData=()=>!Object.keys(D.vs).length&&!Object.keys(D.sv).length&&!Object.keys(D.vp).length;
 
 function dash(){
@@ -405,7 +406,7 @@ function onlineList(r){const out=[],add=(key,date,src,desc,amt)=>{if(N(amt)>0&&i
   return out.sort((a,b)=>a.date.localeCompare(b.date)||b.amt-a.amt)}
 function bankMatch(L){const B=((D.bank&&D.bank.stmt)||[]).slice().sort((a,b)=>a.date.localeCompare(b.date)),man=(D.bank&&D.bank.rec)||{},used=new Set(),res={};
   Object.entries(man).forEach(([k,v])=>{if(v&&v!=="manual")used.add(v)});
-  const addD=(d,n)=>{const x=new Date(d+"T00:00");x.setDate(x.getDate()+n);return iso(x)};
+  const addD=(d,n)=>{const x=new Date(String(d||"").slice(0,10)+"T00:00");if(isNaN(x))return String(d||"");x.setDate(x.getDate()+n);return iso(x)};
   L.forEach(x=>{if(man[x.key]){res[x.key]={how:man[x.key]==="manual"?"hand":"linked",b:B.find(b=>b.id===man[x.key])};return}
     const c=B.filter(b=>!used.has(b.id)&&Math.abs(N(b.amt)-x.amt)<1&&b.date>=addD(x.date,-1)&&b.date<=addD(x.date,4)).sort((a,b)=>Math.abs(new Date(a.date)-new Date(x.date))-Math.abs(new Date(b.date)-new Date(x.date)))[0];
     if(c){used.add(c.id);res[x.key]={how:"auto",b:c}}});
@@ -1672,7 +1673,7 @@ function hoFromPages(rows){const by={};(DBD||[]).forEach(t=>{const R=rows.filter
 function hoCash(dt){const L=(D.dbk||[]).filter(x=>x.date===dt),c=k=>sum(L.filter(k),x=>N(x.amt));
   const sale=c(x=>x.kind==="sale"),old=c(x=>x.kind==="oldsale"),inc=c(x=>x.kind==="income"&&(x.mode||"Cash")==="Cash"),exp=c(x=>(x.kind==="expense"||x.type==="out")&&(x.mode||"Cash")==="Cash");return{sale,old,inc,exp,tot:sale+old+inc-exp,n:L.length}}
 function hoBank(){const all=onlineList(["0000","9999"]),{used,B}=bankMatch(all),man=(D.bank&&D.bank.rec)||{},res={},U=new Set(used);
-  const addD=(d,n)=>{const x=new Date(d+"T00:00");x.setDate(x.getDate()+n);return iso(x)};
+  const addD=(d,n)=>{const x=new Date(String(d||"").slice(0,10)+"T00:00");if(isNaN(x))return String(d||"");x.setDate(x.getDate()+n);return iso(x)};
   Object.values(D.ho||{}).forEach(h=>(h.items||[]).filter(x=>x.kind==="bank").forEach(x=>{const k="ho|"+h.date+"|"+x.id;if(man[k]){res[k]={how:man[k]==="manual"?"hand":"linked",b:B.find(b=>b.id===man[k])};if(man[k]!=="manual")U.add(man[k]);return}
     const c=B.filter(b=>!U.has(b.id)&&Math.abs(N(b.amt)-x.amt)<1&&b.date>=h.date&&b.date<=addD(h.date,3)).sort((a,b)=>a.date.localeCompare(b.date))[0];if(c){U.add(c.id);res[k]={how:"auto",b:c}}}));return res}
 function hoRows(r){const st=Object.keys(D.ho||{}).sort()[0]||"9999";const dates=new Set([...Object.keys(D.ho||{}),...(D.dbk||[]).map(x=>x.date)].filter(d=>d&&d>=st&&inR(d,r)));const BK=hoBank();let run=0;
