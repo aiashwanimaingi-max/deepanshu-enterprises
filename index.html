@@ -67,7 +67,7 @@ dialog .bd{padding:16px;max-height:80vh;overflow:auto}
 <script>
 /* ================= data ================= */
 const KEY="deepanshuHeroDMS_v2";
-const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},fin:[],finpay:[],snap:{},wc:{},areg:[],dupok:{},meta:{},chal:{},old:[],dbk:[],emp:[],att:{},wsd:{}});
+const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},fin:[],finpay:[],snap:{},wc:{},areg:[],dupok:{},meta:{},chal:{},old:[],dbk:[],emp:[],att:{},wsd:{},stkl:null,stkc:[],staff:{},phys:{},jr:{}});
 let D=EMPTY();
 try{const s=localStorage.getItem(KEY);if(s)D=Object.assign(EMPTY(),JSON.parse(s))}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){alert("Browser storage is full or blocked. Take a Backup file.")}}
@@ -160,11 +160,11 @@ function cols(items,fmt){const mx=Math.max(1,...items.map(x=>x[1]));return `<div
 function groupSum(a,kf,vf){const o={};a.forEach(x=>{const k=kf(x)||"Other";o[k]=(o[k]||0)+vf(x)});return Object.entries(o).sort((a,b)=>b[1]-a[1])}
 
 /* ================= views ================= */
-const TABS={dash:"Dashboard",daily:"Daily",fin:"Finance",veh:"Vehicles",svc:"Service",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",money:"Money & Expenses",dbk:"📷 Day Book",ws:"🔧 Workshop",att:"🕘 Attendance",oldb:"Old bikes",imp:"Import DMS files"};
+const TABS={dash:"Dashboard",daily:"Daily",fin:"Finance",veh:"Vehicles",svc:"Service",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",stk:"📦 Stock",money:"Money & Expenses",dbk:"📷 Day Book",ws:"🔧 Workshop",jr:"🎟 Joyride",att:"🕘 Attendance",oldb:"Old bikes",imp:"Import DMS files"};
 let tab="dash";
 function nav(){const dn=dupScan().length;$("nav").innerHTML=Object.entries(dn?{...TABS,dup:"⚠ Duplicates"}:TABS).map(([k,v])=>`<button class="${k===tab?"on":""}" onclick="go('${k}')">${v}${k==="dup"?` <span class="pill p-r">${dn}</span>`:""}${k==="col"&&pending().length?` <span class="pill p-r">${pending().length}</span>`:""}</button>`).join("")}
 function go(t){tab=t;nav();render();scrollTo(0,0)}
-function render(){if(tab==="dup"&&!dupScan().length)tab="dash";({dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,money,dbk,ws:wsk,att,oldb,imp})[tab]()}
+function render(){if(tab==="dup"&&!dupScan().length)tab="dash";({dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,stk,money,dbk,ws:wsk,jr:jry,att,oldb,imp})[tab]()}
 const noData=()=>!Object.keys(D.vs).length&&!Object.keys(D.sv).length&&!Object.keys(D.vp).length;
 
 function dash(){
@@ -820,11 +820,11 @@ function parts(){
   <div class="card"><h3>Parts purchase per month</h3>${cols(ms.map(m=>[ml(m),sum(V(D.pp).filter(p=>p.date.slice(0,7)===m),p=>p.total)]),v=>v>=1e5?(v/1e5).toFixed(1)+"L":Math.round(v/1e3)+"k")}</div>
   <div class="card"><h3>Purchased from</h3>${bars(groupSum(PP,p=>p.sup,p=>p.total).slice(0,6))}</div>
   <div class="card"><h3>Counter sale by category (ex-GST)</h3>${bars(groupSum(PS.flatMap(p=>Object.entries(p.cats)),x=>x[0],x=>x[1]).slice(0,6))}</div></div>
-  <h2>Highest-value parts in stock</h2>${table(["Part no.","Name","Category","Qty","Value"],[...st].sort((a,b)=>b.val-a.val).slice(0,60).map(x=>[esc(x.part),esc(x.name),esc(x.cat),{n:x.qty},{n:rs(x.val)}]),Math.min(60,st.length))}`;
+  <h2>Highest-value parts in stock <button class="btn g s" onclick="go('stk')">📦 Full stock list & physical count →</button></h2>${table(["Part no.","Name","Category","Qty","Value"],[...st].sort((a,b)=>b.val-a.val).slice(0,60).map(x=>[esc(x.part),esc(x.name),esc(x.cat),{n:x.qty},{n:rs(x.val)}]),Math.min(60,st.length))}`;
 }
 
 /* ---------- money ---------- */
-const HEADS={in:["Insurance renewal","Number plate","Finance company payment","Insurance claim","Commission / incentive","Old vehicle sale","Partner put money","Other income"],out:["Distributor payment (vehicles)","Parts supplier payment","Salary","Rent","Electricity","Tea / misc","Transport / freight","Partner withdrawal","Bank charges / EMI","RTO / insurance paid","Other expense"]};
+const HEADS={in:["Insurance renewal","Number plate","Finance company payment","Insurance claim","Commission / incentive","Old vehicle sale","Partner put money","Joyride sale","Other income"],out:["Joyride – paid to company","Joyride expense","Distributor payment (vehicles)","Parts supplier payment","Salary","Rent","Electricity","Tea / misc","Transport / freight","Partner withdrawal","Bank charges / EMI","RTO / insurance paid","Other expense"]};
 let mq="";
 function money(){
   const r=range(),RC=V(D.rc).filter(x=>inR(x.date,r)),EX=D.exp.filter(x=>inR(x.date,r)),CO=Object.entries(D.coll).filter(([,c])=>inR(c.date,r));
@@ -846,13 +846,13 @@ function saveExp(type,id){const v={type,date:$("e_date").value,head:$("e_head").
 
 /* ---------- Day Book (Rojnamcha = vehicle sale register photo → Challan / DMS sale / finance / old bike + other income & expenses, with double check) ---------- */
 let DB=null,DBT=[],DBD=[],DBB=null,dbShowSaved=false,dbPh="",dbq="";
-const DB_HEADS=[[/salar|tankh|तनख|pagar|वेतन/i,"Salary"],[/rent|kiray|किराय/i,"Rent"],[/bijli|बिजली|electric|light bill/i,"Electricity"],[/chai|चाय|tea|nashta|नाश्त|misc/i,"Tea / misc"],[/bhada|भाड़|freight|transport|tempo|cartage/i,"Transport / freight"],[/hmcl|hero moto|distribut|vehicle pay/i,"Distributor payment (vehicles)"],[/parts?\b|spare|lubricant|oil/i,"Parts supplier payment"],[/bank ch|emi|interest|ब्याज/i,"Bank charges / EMI"],[/rto|registration/i,"RTO / insurance paid"],[/withdraw|drawing|ghar|घर/i,"Partner withdrawal"]];
+const DB_HEADS=[[/joy\s*-?\s*ride/i,"Joyride expense"],[/salar|tankh|तनख|pagar|वेतन/i,"Salary"],[/rent|kiray|किराय/i,"Rent"],[/bijli|बिजली|electric|light bill/i,"Electricity"],[/chai|चाय|tea|nashta|नाश्त|misc/i,"Tea / misc"],[/bhada|भाड़|freight|transport|tempo|cartage/i,"Transport / freight"],[/hmcl|hero moto|distribut|vehicle pay/i,"Distributor payment (vehicles)"],[/parts?\b|spare|lubricant|oil/i,"Parts supplier payment"],[/bank ch|emi|interest|ब्याज/i,"Bank charges / EMI"],[/rto|registration/i,"RTO / insurance paid"],[/withdraw|drawing|ghar|घर/i,"Partner withdrawal"]];
 const INS_RE=/insur|ins\.? ?renew|national ins|united india|new india|oriental|iffco|icici lomb|hdfc ergo|tata aig|go ?digit|bajaj (general|allianz)/i;
 function dbCo(t){const n=nz(t);const hit=coList().find(c=>nz(c).length>3&&n.includes(nz(c)));if(hit)return hit;
   const M=[[/bajaj ?fin|\bbfl\b/i,"Bajaj Finance"],[/shri ?ram|sriram|\bsfl\b/i,"Shriram Finance"],[/muthoot|mcsl/i,"Muthoot Capital (MCSL)"],[/chola/i,"Chola Finance"],[/idfc/i,"IDFC First Bank"],[/\bhdb\b/i,"HDB Financial"],[/hero ?fin|hfcl/i,"Hero FinCorp"],[/l ?& ?t fin|\blnt\b/i,"L&T Finance"],[/au small/i,"AU Small Finance"]];
   for(const[r,c]of M)if(r.test(t))return coList().find(x=>nz(x)===nz(c))||c;return""}
 function dbHead(t,type){const s=String(t||"");if(type==="out"){for(const[r,h]of DB_HEADS)if(r.test(s))return h;return"Other expense"}
-  return /ins\.? ?renew|renewal/i.test(s)?"Insurance renewal":dbCo(s)?"Finance company payment":INS_RE.test(s)?"Insurance claim":/commission|incentive/i.test(s)?"Commission / incentive":"Other income"}
+  return /joy\s*-?\s*ride/i.test(s)?"Joyride sale":/ins\.? ?renew|renewal/i.test(s)?"Insurance renewal":dbCo(s)?"Finance company payment":INS_RE.test(s)?"Insurance claim":/commission|incentive/i.test(s)?"Commission / incentive":"Other income"}
 const DB_INC={renewal:"Insurance renewal",numberplate:"Number plate"};
 function dbIncDetect(t){t=String(t||"");return/plate|hsrp|\bnp\b|नंबर|नम्बर|प्लेट/i.test(t)?"numberplate":/renew|\brent\b|renual|ins\.?\s*re|बीमा|इंश्यो/i.test(t)?"renewal":""}
 function dbHeadR(r){if(r.kind==="income"||r.type==="in"){if(DB_INC[r.incType])return DB_INC[r.incType];const d=dbIncDetect(r.name+" "+r.det);if(DB_INC[d])return DB_INC[d]}return dbHead(r.name+" "+r.det,r.kind==="expense"||r.type==="out"?"out":"in")}
@@ -1181,7 +1181,7 @@ const wsJobSame=(a,b)=>a&&b&&dbEq(a.online,b.online)&&dbEq(a.cash,b.cash)&&Strin
 const wsExSame=(d,o)=>o&&o.exSaved&&JSON.stringify([d.counter,d.updates,d.expenses].map(x=>x.map(y=>[y.desc,N(y.online),N(y.cash),N(y.amt)])))===JSON.stringify([o.counter||[],o.updates||[],o.expenses||[]].map(x=>x.map(y=>[y.desc,N(y.online),N(y.cash),N(y.amt)])));
 function wsRec(d){return D.wsd[d.date]||{date:d.date,src:d.src||"",jobs:[],counter:[],updates:[],expenses:[],tot:d.tot,exSaved:false}}
 function wsExpW(d,W){D.exp.filter(e=>e.src==="ws"&&e.wsDate===d.date).forEach(e=>W.push(["del","exp",e.id]));D.exp=D.exp.filter(e=>!(e.src==="ws"&&e.wsDate===d.date));
-  d.expenses.forEach((x,k)=>{const e={id:"ws-"+d.date+"-"+k,type:"out",date:d.date,head:"Workshop: "+(x.desc||"Expense"),amt:x.amt,mode:"Cash",note:"Workshop Day Book",src:"ws",wsDate:d.date};D.exp.push(e);W.push(["set","exp",e.id,e])})}
+  d.expenses.forEach((x,k)=>{const e={id:"ws-"+d.date+"-"+k,type:"out",date:d.date,head:(JR_RE.test(x.desc||"")?"Joyride expense: ":"Workshop: ")+(x.desc||"Expense"),amt:x.amt,mode:"Cash",note:"Workshop Day Book",src:"ws",wsDate:d.date};D.exp.push(e);W.push(["set","exp",e.id,e])})}
 function wsDone(i){const d=WSR[i],o=D.wsd[d.date];if(o&&d.jobs.every(j=>wsJobSame(j,o.jobs.find(x=>x.jc===j.jc)))&&(wsExSame(d,o)||!(d.counter.length||d.updates.length||d.expenses.length))){WSR.splice(i,1);if(!WSR.length)WSR=null;wsPh=`✔ ${fd(d.date)} - full workshop account saved`}}
 const wsClean=j=>({sno:j.sno||"",jc:j.jc,online:N(j.online),cash:N(j.cash),type:j.type||"",work:j.work||"",note:j.note||""});
 async function wsSaveJob(i,k){const d=WSR[i];if(!d.date)return alert("Enter the date above first");const j=d.jobs[k],rec=wsRec(d);
@@ -1237,8 +1237,12 @@ function atNorm(v){const s=String(v??"").trim().toLowerCase();if(!s||/^[-—–.
   const t=s.match(/(\d{1,2})(?:[:.](\d{2}))?/);if(t&&+t[1]<=12)return"P "+t[1]+(t[2]?":"+t[2]:"");return"P"}
 const atCls=v=>!v?"":v[0]==="P"?"p-ok":v==="H"?"p-w":v==="L"?"p-r":"p-n";
 const atLbl=v=>!v?"·":v[0]==="P"?(v.slice(2)||"P"):v==="H"?"½":v==="L"?"L":"Off";
-function atCalc(m,e){const dim=atDim(m),c={P:0,H:0,L:0,O:0,X:0};for(let d=1;d<=dim;d++){const v=atGet(m,e.id,d);if(!v)c.X++;else c[v[0]==="P"?"P":v]++}
-  const free=N((D.att[m]||{}).paidLeaves),lv=Math.max(0,c.L+c.H/2-free),per=N(e.salary)/dim;return{...c,dim,free,lv,per,ded:lv*per,pay:N(e.salary)-lv*per}}
+const atSat=(m,d)=>new Date(+m.slice(0,4),+m.slice(5,7)-1,+d).getDay()===6;
+function atCalc(m,e){const dim=atDim(m),c={P:0,H:0,L:0,O:0,X:0,SP:0,SH:0,SO:0};for(let d=1;d<=dim;d++){const v=atGet(m,e.id,d);
+    if(atSat(m,d)){if(!v||v==="O"||v==="L")c.SO++;else if(v==="H")c.SH++;else c.SP++;continue}
+    if(!v)c.X++;else c[v[0]==="P"?"P":v]++}
+  const free=N((D.att[m]||{}).paidLeaves),lv=Math.max(0,c.L+c.H/2-free),per=N(e.salary)/dim,satRate=N(e.sat)||per,extra=(c.SP+c.SH/2)*satRate;
+  return{...c,dim,free,lv,per,satRate,extra,ded:lv*per,pay:N(e.salary)-lv*per+extra}}
 async function atSet(m,eid,day,v){const doc=D.att[m]||(D.att[m]={m,d:{},paidLeaves:N((D.att[atPrevM(m)]||{}).paidLeaves)});doc.d=doc.d||{};doc.d[eid]=doc.d[eid]||{};if(v)doc.d[eid][String(+day)]=v;else delete doc.d[eid][String(+day)];save();await dbCommit([["set","att",m,doc]])}
 const atPrevM=m=>{const d=new Date(+m.slice(0,4),+m.slice(5,7)-2,1);return iso(d).slice(0,7)};
 function atMark(eid,v){const m=atDay.slice(0,7),d=+atDay.slice(8,10),t=$("att_t_"+eid);let val=v;if(v==="P"&&t&&t.value)val="P "+t.value.replace(/^0/,"");atSet(m,eid,d,val).then(att)}
@@ -1246,15 +1250,15 @@ async function atAllP(){const m=atDay.slice(0,7),d=+atDay.slice(8,10),doc=D.att[
   atEmps().forEach(e=>{doc.d[e.id]=doc.d[e.id]||{};if(!doc.d[e.id][String(d)]){doc.d[e.id][String(d)]="P";n++}});save();await dbCommit([["set","att",m,doc]]);att()}
 function atCycle(eid,day){const m=atMon,o=["P","H","L","O",""],v=atGet(m,eid,day),k=o.indexOf(v[0]==="P"?"P":v);atSet(m,eid,day,o[(k+1)%o.length]).then(att)}
 function empForm(id){const e=D.emp.find(x=>x.id===id)||{active:true};open(id?"Edit employee":"New employee",`<div class="form"><div><label>name *</label><input id="em_n" value="${esc(e.name)}"></div><div><label>Role</label><input id="em_r" value="${esc(e.role)}" placeholder="Mechanic, Washing…"></div>
-  <div><label>Monthly salary ₹</label><input id="em_s" type="number" value="${e.salary||""}"></div><div><label>Order</label><input id="em_o" type="number" value="${e.ord||""}"></div><div><label>Status</label><select id="em_a"><option value="1">Working</option><option value="0" ${e.active===false?"selected":""}>Left</option></select></div></div>
+  <div><label>Monthly salary ₹</label><input id="em_s" type="number" value="${e.salary||""}"></div><div><label>Extra for a Saturday worked ₹</label><input id="em_sat" type="number" value="${e.sat||""}" placeholder="blank = one day's salary"></div><div><label>Order</label><input id="em_o" type="number" value="${e.ord||""}"></div><div><label>Status</label><select id="em_a"><option value="1">Working</option><option value="0" ${e.active===false?"selected":""}>Left</option></select></div></div>
   <div class="row" style="margin-top:12px"><button class="btn" onclick="empSave('${jsq(id||"")}')">Save</button></div>`)}
-async function empSave(id){const v={name:$("em_n").value.trim(),role:$("em_r").value.trim(),salary:N($("em_s").value),ord:N($("em_o").value),active:$("em_a").value==="1"};if(!v.name)return alert("Enter a name");
+async function empSave(id){const v={name:$("em_n").value.trim(),role:$("em_r").value.trim(),salary:N($("em_s").value),sat:N($("em_sat").value),ord:N($("em_o").value),active:$("em_a").value==="1"};if(!v.name)return alert("Enter a name");
   if(!id&&D.emp.some(e=>nz(e.name)===nz(v.name))&&!confirm("An employee with this name already exists. Create a new one anyway?"))return;
   const x=id?Object.assign(D.emp.find(e=>e.id===id),v):{id:uid(),...v};if(!id)D.emp.push(x);save();dlg.close();await dbCommit([["set","emp",x.id,x]]);att()}
 async function atPaid(m,v){const doc=D.att[m]||(D.att[m]={m,d:{}});doc.paidLeaves=N(v);save();await dbCommit([["set","att",m,doc]]);att()}
 const AT_PROMPT=m=>`This is a photo of a staff attendance register of a two-wheeler dealership (the printed form says "Teachers attendance register"; ignore the printed words). The month is ${new Date(m+"-01T00:00").toLocaleDateString("en-IN",{month:"long",year:"numeric"})} unless another month is clearly written at the top.
 Rows are the days 1 to 31. Each column that has entries belongs to ONE employee whose name is handwritten at the top of that column (a printed group of Arr/Sig/Dep/Sig columns can hold several employees — read the handwritten name above each column). Read every employee column.
-For each day give one value: the arrival time if a time or number is written ("9", "9:30", "10"), "L" for leave/absent ("leave", "lee", "absent", "A"), "H" for half day ("half day", "hlfdy"), "O" for an off day (a line drawn across, "Saturday ×", holiday, Sunday), "P" for "P", present or training, "" if empty.
+For each day give one value: the arrival time if a time or number is written ("9", "9:30", "10"), "L" for leave/absent ("leave", "lee", "absent", "A"), "H" for half day ("half day", "hlfdy"), "O" for an off day (a line drawn across, "Saturday ×", holiday, Sunday; Saturday is the weekly off, so read a Saturday as "O" unless a time or P is clearly written for that employee), "P" for "P", present or training, "" if empty.
 Return ONLY JSON: {"month":"YYYY-MM","employees":[{"name":"Satbir","days":{"1":"9","2":"L","3":"9:30"}}]}. Do not invent employees or days.`;
 async function atPhoto(files){files=[...files||[]];if(!files.length)return;const m=$("at_pm").value||today().slice(0,7);const st=h=>{atPh=h;const e=$("at_ph");if(e)e.innerHTML=h};
   try{let rows=[];for(const [i,f] of files.entries()){st(`⏳ Page ${i+1}/${files.length} reading… (30–60 seconds)`);const j=await aiRead(AT_PROMPT(m),await imgB64(f));const mm=/^\d{4}-\d{2}$/.test(String(j.month||""))?j.month:m;
@@ -1274,8 +1278,8 @@ function att(){if(!atDay)atDay=today();if(!atMon)atMon=today().slice(0,7);const 
   if(!D.emp.length&&atView!=="photo"&&atView!=="emp"){$("app").innerHTML=tabs+`<div class="card" style="text-align:center;padding:30px"><h2 style="margin-top:0">Add employees first</h2><p class="muted">Enter names and monthly salary, or upload a register photo and names are created automatically.</p><button class="btn" onclick="empForm()">+ Employee</button> <button class="btn g" onclick="atView='photo';att()">📷 Register photo</button></div>`;return}
   if(atView==="emp"){$("app").innerHTML=tabs+`<div class="row"><button class="btn" onclick="empForm()">+ Employee</button></div>${table(["Name","Role","Salary","Status",""],D.emp.slice().sort((a,b)=>(a.ord||0)-(b.ord||0)).map(e=>[`<b>${esc(e.name)}</b>`,esc(e.role||""),{n:e.salary?rs(e.salary):`<span class="neg">Enter</span>`},e.active===false?`<span class="pill p-n">Left</span>`:`<span class="pill p-ok">Working</span>`,`<button class="btn g s" onclick="empForm('${jsq(e.id)}')">Edit</button>`]))}`;return}
   if(atView==="day"){const m=atDay.slice(0,7),d=+atDay.slice(8,10),cnt=k=>E.filter(e=>{const v=atGet(m,e.id,d);return k==="P"?v[0]==="P":k==="X"?!v:v===k}).length;
-    $("app").innerHTML=tabs+`<div class="row"><input type="date" value="${atDay}" onchange="atDay=this.value;att()" style="width:auto"><button class="btn g" onclick="atAllP()">Mark rest Present</button>
-    <span class="pill p-ok">${cnt("P")} Present</span><span class="pill p-w">${cnt("H")} ½</span><span class="pill p-r">${cnt("L")} Leave</span><span class="pill p-n">${cnt("O")} Off</span>${cnt("X")?`<span class="pill p-n">${cnt("X")} Due</span>`:""}</div>
+    const sat=atSat(m,d);$("app").innerHTML=tabs+`${sat?`<div class="note" style="margin-bottom:8px"><b>Saturday – off day.</b> Mark <b>Present</b> only for those who came today; they get the Saturday extra in their salary. Nobody else needs to be marked.</div>`:""}<div class="row"><input type="date" value="${atDay}" onchange="atDay=this.value;att()" style="width:auto">${sat?"":`<button class="btn g" onclick="atAllP()">Mark rest Present</button>`}
+    <span class="pill p-ok">${cnt("P")} Present</span><span class="pill p-w">${cnt("H")} ½</span><span class="pill p-r">${cnt("L")} Leave</span><span class="pill p-n">${cnt("O")} Off</span>${cnt("X")&&!sat?`<span class="pill p-n">${cnt("X")} Due</span>`:""}</div>
     ${table(["Employee","Now","Arrival time","Mark"],E.map(e=>{const v=atGet(m,e.id,d);return[`<b>${esc(e.name)}</b><div class="muted">${esc(e.role||"")}</div>`,`<span class="pill ${atCls(v)}">${v?atLbl(v):"—"}</span>`,`<input id="att_t_${esc(e.id)}" type="time" style="width:auto" value="${v[0]==="P"&&v.slice(2)?(v.slice(2).includes(":")?v.slice(2):v.slice(2)+":00").padStart(5,"0"):""}">`,
       `<span class="row" style="margin:0">${[["P","✓ Present","btn s"],["H","½ Half","btn g s"],["L","Leave","btn g s"],["O","Off","btn g s"],["","Clear","btn g s"]].map(([c,l,k])=>`<button class="${k}" onclick="atMark('${jsq(e.id)}','${c}')">${l}</button>`).join("")}</span>`]}))}`;return}
   if(atView==="photo"){const ph=`<div class="card"><b>📷 Attendance register photo</b><div class="muted">A straight, clear photo of both pages of the open register. Names at the top should be clear.</div>
@@ -1288,11 +1292,11 @@ function att(){if(!atDay)atDay=today();if(!atMon)atMon=today().slice(0,7);const 
     <div class="row" style="margin-top:10px"><button class="btn" onclick="atPSave()">✓ Attendance Save </button><button class="btn g" onclick="ATR=null;atPh='';att()">✕ Cancel</button></div>`;return}
   const m=atMon,dim=atDim(m),doc=D.att[m]||{},R=E.map(e=>({e,c:atCalc(m,e)}));
   $("app").innerHTML=tabs+`<div class="row"><input type="month" value="${m}" onchange="atMon=this.value;att()" style="width:auto"><label style="margin:0">Free leaves per month</label><input type="number" style="width:70px" value="${N(doc.paidLeaves)}" onchange="atPaid('${jsq(m)}',this.value)"><span class="muted">Click a cell to change it · Off = day off (no deduction)</span></div>
-  <div class="grid"><div class="card stat"><div class="l">Total salary</div><div class="n">${lakh(sum(E,e=>N(e.salary)))}</div></div><div class="card stat"><div class="l">Deduction (leave)</div><div class="n neg">${rs(sum(R,x=>x.c.ded))}</div></div><div class="card stat"><div class="l">To pay</div><div class="n pos">${lakh(sum(R,x=>x.c.pay))}</div></div><div class="card stat"><div class="l">Attendance Due</div><div class="n ${sum(R,x=>x.c.X)?"neg":""}">${sum(R,x=>x.c.X)}</div><div class="s">days (empty cells)</div></div></div>
-  <div class="tw" style="margin-top:12px"><table><tr><th>Employee</th>${Array.from({length:dim},(_,k)=>{const wd=new Date(+m.slice(0,4),+m.slice(5,7)-1,k+1).getDay();return`<th style="padding:4px;text-align:center;${wd===0?"color:var(--red)":""}">${k+1}</th>`}).join("")}<th>P</th><th>½</th><th>L</th><th>Off</th><th>Salary</th><th>Deduction</th><th>To pay</th></tr>
-  ${R.map(({e,c})=>`<tr><td style="white-space:nowrap"><b>${esc(e.name)}</b></td>${Array.from({length:dim},(_,k)=>{const v=atGet(m,e.id,k+1);return`<td style="padding:2px;text-align:center"><span class="pill ${atCls(v)}" style="cursor:pointer;min-width:22px" onclick="atCycle('${jsq(e.id)}',${k+1})">${atLbl(v)}</span></td>`}).join("")}
-   <td class="num">${c.P}</td><td class="num">${c.H}</td><td class="num">${c.L}</td><td class="num">${c.O}</td><td class="num">${e.salary?rs(e.salary):`<span class="neg">?</span>`}</td><td class="num neg">${c.ded?rs(c.ded):""}</td><td class="num"><b>${rs(c.pay)}</b>${c.X?`<div class="muted" style="font-size:11px">${c.X} days pending</div>`:""}</td></tr>`).join("")}</table></div>
-  <p class="muted">Calculation: one day = Salary ÷ ${dim} (days in month) · Leave = 1 day, Half day = ½ day · free leaves are subtracted, the remaining days are deducted · Off / Sunday / Saturday × days are not deducted.</p>`}
+  <div class="grid"><div class="card stat"><div class="l">Total salary</div><div class="n">${lakh(sum(E,e=>N(e.salary)))}</div></div><div class="card stat"><div class="l">Saturday extra</div><div class="n">${rs(sum(R,x=>x.c.extra))}</div><div class="s">${sum(R,x=>x.c.SP+x.c.SH/2)} Saturdays worked</div></div><div class="card stat"><div class="l">Deduction (leave)</div><div class="n neg">${rs(sum(R,x=>x.c.ded))}</div></div><div class="card stat"><div class="l">To pay</div><div class="n pos">${lakh(sum(R,x=>x.c.pay))}</div></div><div class="card stat"><div class="l">Attendance Due</div><div class="n ${sum(R,x=>x.c.X)?"neg":""}">${sum(R,x=>x.c.X)}</div><div class="s">days (empty cells)</div></div></div>
+  <div class="tw" style="margin-top:12px"><table><tr><th>Employee</th>${Array.from({length:dim},(_,k)=>{const wd=new Date(+m.slice(0,4),+m.slice(5,7)-1,k+1).getDay();return`<th style="padding:4px;text-align:center;${wd===6?"background:#eef3ff;color:var(--blue,#2456c7)":wd===0?"color:var(--red)":""}">${k+1}${wd===6?"<div style='font-size:9px'>Sat</div>":""}</th>`}).join("")}<th>P</th><th>½</th><th>L</th><th>Off</th><th>Sat worked</th><th>Salary</th><th>Deduction</th><th>Sat extra</th><th>To pay</th></tr>
+  ${R.map(({e,c})=>`<tr><td style="white-space:nowrap"><b>${esc(e.name)}</b></td>${Array.from({length:dim},(_,k)=>{const v=atGet(m,e.id,k+1),st=atSat(m,k+1);return`<td style="padding:2px;text-align:center;${st?"background:#eef3ff":""}"><span class="pill ${st&&!v?"p-n":atCls(v)}" style="cursor:pointer;min-width:22px;${st&&v&&v[0]==="P"?"outline:2px solid var(--green)":""}" title="${st?"Saturday – off day. Present = extra pay":""}" onclick="atCycle('${jsq(e.id)}',${k+1})">${st&&(!v||v==="O")?"Off":atLbl(v)}</span></td>`}).join("")}
+   <td class="num">${c.P}</td><td class="num">${c.H}</td><td class="num">${c.L}</td><td class="num">${c.O+c.SO}</td><td class="num">${c.SP+c.SH/2||""}</td><td class="num">${e.salary?rs(e.salary):`<span class="neg">?</span>`}</td><td class="num neg">${c.ded?rs(c.ded):""}</td><td class="num pos">${c.extra?"+"+rs(c.extra):""}</td><td class="num"><b>${rs(c.pay)}</b>${c.X?`<div class="muted" style="font-size:11px">${c.X} days pending</div>`:""}</td></tr>`).join("")}</table></div>
+  <p class="muted">Calculation: one day = Salary ÷ ${dim} (days in month) · Leave = 1 day, Half day = ½ day · free leaves are subtracted, the remaining days are deducted · Off days are not deducted · <b>Saturday is the weekly off</b>: a blank Saturday is not "due" and not deducted; an employee <b>present on a Saturday gets extra</b> = one day's salary (or the amount set in Employees), half day = half of it.</p>`}
 
 /* ---------- import ---------- */
 function imp(){
@@ -1303,7 +1307,7 @@ function imp(){
   <div class="card"><h3>Reports this app reads</h3>
   ${table(["Report (DMS export)","Rows in app","Last import"],Object.entries(REPORTS).map(([k,v])=>[esc(v.name),{n:k==="stock"?D.stock.length:Object.keys(D[k]).length},D.meta[k]?`${fd(D.meta[k].at)} <span class="muted">${esc(D.meta[k].from)}–${esc(D.meta[k].to)}</span>`:`<span class="muted">not yet</span>`]))}
   <p><button class="btn g s" onclick="cloudCheck()">☁ Cloud check (if data seems missing)</button></p><div id="cc_out" style="margin-bottom:10px"></div><p class="muted">The same invoice / VIN is updated, never doubled — so every week you can export from 1 April and import again. Parts Stock is replaced with the latest file.</p>
-  ${FB?`<p class="muted">Database: <b>${esc(fbCfg().projectId)}</b> · login ${esc(ME)}</p>${FB_CONFIG?"":`<button class="btn g s" onclick="if(confirm('Disconnect this device from this database? Cloud data is not deleted.')){localStorage.removeItem(FBK);logout()}">Change database</button> `}${rulesBox(ME,"")}`:""}<button class="btn g s" onclick="clearDMS()">Clear DMS data</button></div></div>`;
+  ${FB?`<p class="muted">Database: <b>${esc(fbCfg().projectId)}</b> · login ${esc(ME)}</p>${FB_CONFIG?"":`<button class="btn g s" onclick="if(confirm('Disconnect this device from this database? Cloud data is not deleted.')){localStorage.removeItem(FBK);logout()}">Change database</button> `}${rulesBox(ME,((D.staff||{}).fin||[]).join(", "),((D.staff||{}).stock||[]).join(", "))}`:""}<button class="btn g s" onclick="clearDMS()">Clear DMS data</button></div></div>`;
   const dr=$("drop");["dragenter","dragover"].forEach(e=>dr.addEventListener(e,ev=>{ev.preventDefault();dr.classList.add("over")}));["dragleave","drop"].forEach(e=>dr.addEventListener(e,ev=>{ev.preventDefault();dr.classList.remove("over")}));dr.addEventListener("drop",ev=>importFiles(ev.dataTransfer.files));
 }
 async function importFiles(files){
@@ -1331,6 +1335,173 @@ async function importFiles(files){
 }
 
 
+/* ================= JOYRIDE account (sold from DMS service bills + workshop day book, company cost, joyride expenses) ================= */
+const JR_RE=/joy\s*-?\s*ride/i,isJrHead=h=>/^joyride/i.test(String(h||""));
+function jrData(r){const W={};Object.values(D.wsd||{}).forEach(d=>(d.jobs||[]).forEach(j=>{W[String(j.jc)]={...j,date:d.date}}));
+  const S=V(D.sv).filter(s=>s.open&&JR_RE.test(s.jt||"")&&(!r||inR(s.date,r))).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const seenJC=new Set(S.map(s=>wsJobNo(s)).filter(Boolean));
+  const sold=S.filter(s=>N(s.total)>0).map(s=>{const w=W[wsJobNo(s)];return{date:s.date,no:s.no,jc:wsJobNo(s),cust:s.cust,amt:N(s.total),it:s.it,online:w?N(w.online):null,cash:w?N(w.cash):null,src:"DMS"}});
+  Object.values(D.wsd||{}).forEach(d=>(!r||inR(d.date,r))&&(d.jobs||[]).forEach(j=>{if(JR_RE.test(j.type||"")&&!seenJC.has(String(j.jc)))sold.push({date:d.date,no:"",jc:j.jc,cust:"",amt:N(j.online)+N(j.cash),it:"",online:N(j.online),cash:N(j.cash),src:"Workshop sheet"})}));
+  const free=S.filter(s=>!(N(s.total)>0));
+  const ex=D.exp.filter(e=>isJrHead(e.head)&&(!r||inR(e.date,r))).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const notes=[];Object.values(D.wsd||{}).filter(d=>!r||inR(d.date,r)).forEach(d=>{(d.jobs||[]).forEach(j=>{if(JR_RE.test(j.note||""))notes.push({date:d.date,t:j.note})});[...(d.counter||[]),...(d.updates||[])].forEach(x=>{if(JR_RE.test(x.desc||""))notes.push({date:d.date,t:x.desc+" · "+rs(N(x.online)+N(x.cash))})})});
+  const rate=N((D.jr||{}).rate),paid=sum(ex.filter(e=>e.type==="out"&&/company/i.test(e.head)),e=>N(e.amt)),spent=sum(ex.filter(e=>e.type==="out"&&!/company/i.test(e.head)),e=>N(e.amt)),extraIn=sum(ex.filter(e=>e.type==="in"),e=>N(e.amt));
+  const salesAmt=sum(sold,x=>x.amt),cost=rate*sold.length;
+  return{sold:sold.sort((a,b)=>(b.date||"").localeCompare(a.date||"")),free,ex,notes,rate,paid,spent,extraIn,salesAmt,cost,due:cost-paid,margin:salesAmt+extraIn-cost-spent}}
+function jry(){const r=range(),J=jrData(r);
+  $("app").innerHTML=`<div class="row">${perSel()}<button class="btn" onclick="expForm('out');$('e_head').value='Joyride – paid to company'">− Paid to company</button><button class="btn g" onclick="expForm('out');$('e_head').value='Joyride expense'">− Joyride expense</button>
+   <label style="margin:0">Company price per Joyride ₹</label><input type="number" style="width:100px" value="${J.rate||""}" placeholder="enter" onchange="jrRate(this.value)"></div>
+  <div class="grid"><div class="card stat"><div class="l">Joyrides sold</div><div class="n">${J.sold.length}</div><div class="s">${rs(J.salesAmt)}</div></div>
+   <div class="card stat"><div class="l">Company cost</div><div class="n">${J.rate?rs(J.cost):"–"}</div><div class="s">${J.rate?`${J.sold.length} × ${rs(J.rate)}`:"enter price above"}</div></div>
+   <div class="card stat"><div class="l">Paid to company</div><div class="n">${rs(J.paid)}</div><div class="s">${J.rate?(J.due>0?`<span class="neg">Due ${rs(J.due)}</span>`:J.due<0?`Advance ${rs(-J.due)}`:"Settled"):""}</div></div>
+   <div class="card stat"><div class="l">Joyride expenses</div><div class="n neg">${rs(J.spent)}</div></div>
+   <div class="card stat"><div class="l">Joyride margin</div><div class="n ${J.margin<0?"neg":"pos"}">${J.rate?rs(J.margin):"–"}</div><div class="s">sales − company cost − expenses</div></div>
+   <div class="card stat"><div class="l">Free services used</div><div class="n">${J.free.length}</div><div class="s">DMS Joyride bills of ₹0</div></div></div>
+  <h2>Joyrides sold</h2>${!J.sold.length?`<p class="muted">No Joyride bills in this period. DMS service bills with job type "Joyride" show here.</p>`:table(["Date","Bill","JC","Customer","Amount","Workshop sheet","Source"],J.sold.map(x=>[fd(x.date),esc(String(x.no).replace(/^66115/,"")),esc(x.jc||""),esc(x.cust||""),{n:rs(x.amt)},x.online===null?`<span class="muted">not in sheet</span>`:`${x.online?"online "+rs(x.online):""}${x.cash?" cash "+rs(x.cash):""}${!x.online&&!x.cash?`<span class="neg">no payment</span>`:dbEq(x.online+x.cash,x.amt)?" ✔":` <span class="neg">diff ${rs(x.online+x.cash-x.amt)}</span>`}`,`<span class="pill p-n">${x.src}</span>`]))}
+  <h2>Joyride ledger (payments & expenses)</h2>${!J.ex.length?`<p class="muted">Nothing yet. Expenses written as "joyride" in the Workshop sheet or Day Book come here by themselves; or use the buttons above.</p>`:table(["Date","Head","Details","In","Out",""],J.ex.map(e=>[fd(e.date),esc(e.head),`<span class="muted">${esc(e.note||"")}</span>`,{n:e.type==="in"?rs(e.amt):""},{n:e.type==="out"?`<span class="neg">${rs(e.amt)}</span>`:""},e.src==="ws"?`<span class="pill p-n">Workshop</span>`:`<button class="btn g s" onclick="expForm('${e.type}','${jsq(e.id)}')">Edit</button>`]))}
+  ${J.free.length?`<h2>Free services under Joyride</h2>${table(["Date","Bill","JC","Customer","Type"],J.free.map(s=>[fd(s.date),esc(s.no.replace(/^66115/,"")),esc(wsJobNo(s)||""),esc(s.cust),esc(s.jt+" · "+s.it)]))}`:""}
+  ${J.notes.length?`<div class="note" style="margin-top:12px"><b>Joyride notes written on the workshop sheet:</b> ${J.notes.map(n=>`${fd(n.date)}: ${esc(n.t)}`).join(" · ")}</div>`:""}
+  <p class="muted">All Joyride entries are also in <b>Money & Expenses</b> under heads starting with "Joyride".</p>`}
+async function jrRate(v){D.jr={...(D.jr||{}),rate:N(v)};save();await dbCommit([["set","meta","jr",D.jr]]);jry()}
+
+/* ================= STOCK: DMS stock list · physical count by staff · staff logins ================= */
+let stkV="list",stkQ="",stkSort="val",stkMin="",stkMax="",stkCat="",stkCS="all",stkF="diff",stkLim=300;
+const STK_BANDS=[[10000,0,"₹10,000 +"],[5000,10000,"₹5,000 – 10,000"],[1000,5000,"₹1,000 – 5,000"],[500,1000,"₹500 – 1,000"],[100,500,"₹100 – 500"],[0,100,"Below ₹100"]];
+const STK_KEYS=["id","list","date","by","name","at","n","done","j","x"];
+function stkItems(){const m={};(D.stock||[]).forEach(r=>{const k=String(r.part||"").trim();if(!k)return;const o=m[k]||(m[k]={part:k,name:r.name||"",cat:r.cat||"",qty:0,val:0});o.qty+=N(r.qty);o.val+=N(r.val)});
+  return Object.values(m).map(o=>({...o,price:o.qty?o.val/o.qty:0}))}
+function stkFilter(A){const q=stkQ.trim().toLowerCase(),mn=N(stkMin),mx=N(stkMax);
+  A=A.filter(x=>(!q||(x.part+" "+x.name).toLowerCase().includes(q))&&(!stkCat||x.cat===stkCat)&&(stkMin===""||x.price>=mn)&&(stkMax===""||x.price<mx));
+  const f={val:(a,b)=>b.val-a.val,price:(a,b)=>b.price-a.price,priceLo:(a,b)=>a.price-b.price,qty:(a,b)=>b.qty-a.qty,name:(a,b)=>a.name.localeCompare(b.name)}[stkSort]||((a,b)=>b.val-a.val);
+  return A.sort(f)}
+const stkPhys=p=>(D.phys&&D.phys.j&&D.phys.j[p])||null;
+function stkSet(k,v){if(k==="stkCat")stkCat=v;else if(k==="stkMin")stkMin=v;else if(k==="stkMax")stkMax=v;else if(k==="stkSort")stkSort=v;stkLim=300;stk()}
+const stkWho=c=>((D.staff&&D.staff.names)||{})[c.by]||c.name||c.by;
+function stk(){
+  const seg=`<div class="row"><span class="seg">${[["list","Stock today"],["count","Physical count"],["staff","Staff logins"]].map(([v,l])=>`<button class="${stkV===v?"on":""}" onclick="stkV='${v}';stk()">${l}</button>`).join("")}</span></div>`;
+  $("app").innerHTML=seg+({list:stkListHtml,count:stkCountHtml,staff:stkStaffHtml}[stkV]||stkListHtml)()}
+function stkListHtml(){const all=stkItems().filter(x=>x.qty>0),A=stkFilter(all),cats=[...new Set(all.map(x=>x.cat).filter(Boolean))].sort();
+  const mt=D.meta&&D.meta.stock;
+  if(!all.length)return`<div class="card empty" style="margin-top:12px">No parts stock yet. Export the <b>Parts Stock Report</b> from DMS and add it in <a href="#" onclick="go('imp');return false">Import DMS files</a>.</div>`;
+  const bands=STK_BANDS.map(([lo,hi,l])=>{const B=all.filter(x=>x.price>=lo&&(!hi||x.price<hi));return{lo,hi,l,n:B.length,pcs:sum(B,x=>x.qty),val:sum(B,x=>x.val)}});
+  const on=b=>String(stkMin)===String(b.lo)&&String(stkMax)===String(b.hi||"");
+  return`<div class="note" style="margin-top:10px">DMS stock as of <b>${mt?fd(mt.at):"–"}</b>${mt&&mt.file?` <span class="muted">(${esc(mt.file)})</span>`:""}. To bring it up to date, export today's <b>Parts Stock Report</b> from DMS and add it in <a href="#" onclick="go('imp');return false">Import DMS files</a>.${D.phys&&D.phys.date?` · Last physical count accepted: <b>${fd(D.phys.date)}</b>`:""}</div>
+  <div class="grid" style="margin-top:10px"><div class="card stat"><div class="l">Part nos. in stock</div><div class="n">${all.length}</div><div class="s">${Math.round(sum(all,x=>x.qty))} pcs</div></div><div class="card stat"><div class="l">Stock value</div><div class="n">${lakh(sum(all,x=>x.val))}</div></div><div class="card stat"><div class="l">Shown below</div><div class="n">${A.length}</div><div class="s">${Math.round(sum(A,x=>x.qty))} pcs · ${lakh(sum(A,x=>x.val))}</div></div></div>
+  <div class="card" style="margin-top:10px"><h3 style="margin-top:0">By price of one piece <span class="muted" style="font-weight:400;font-size:13px">(click to show only that range)</span></h3>
+  ${table(["Price of one piece","Part nos.","Pieces","Value"],bands.map(b=>[`<a href="#" onclick="stkMin='${b.lo}';stkMax='${b.hi||""}';stkLim=300;stk();return false">${on(b)?"<b>▶ "+b.l+"</b>":b.l}</a>`,{n:b.n},{n:Math.round(b.pcs)},{n:rs(b.val)}]))}</div>
+  <div class="row" style="margin-top:12px;flex-wrap:wrap;gap:6px"><input placeholder="Search part no. / name" value="${esc(stkQ)}" oninput="stkQ=this.value;stkLim=300;stk();refocus(this)">
+   <select onchange="stkSet('stkCat',this.value)"><option value="">All categories</option>${cats.map(c=>`<option ${c===stkCat?"selected":""}>${esc(c)}</option>`).join("")}</select>
+   <label class="muted" style="margin:0">Price ₹ from</label><input type="number" style="width:90px" placeholder="min" value="${esc(stkMin)}" onchange="stkSet('stkMin',this.value)"><label class="muted" style="margin:0">below</label><input type="number" style="width:90px" placeholder="max" value="${esc(stkMax)}" onchange="stkSet('stkMax',this.value)">
+   <select onchange="stkSet('stkSort',this.value)">${[["val","Sort: highest total value"],["price","Sort: costliest piece first"],["priceLo","Sort: cheapest piece first"],["qty","Sort: most pieces"],["name","Sort: name A–Z"]].map(([v,l])=>`<option value="${v}" ${v===stkSort?"selected":""}>${l}</option>`).join("")}</select>
+   ${stkQ||stkCat||stkMin!==""||stkMax!==""?`<button class="btn g s" onclick="stkQ='';stkCat='';stkMin='';stkMax='';stkLim=300;stk()">Clear filters</button>`:""}
+   <button class="btn g s" onclick="stkXls()">⬇ Excel</button> <button class="btn s" onclick="stkPublish()">📋 Send these ${A.length} parts to staff for counting</button></div>
+  ${table(["Part no.","Name","Category","DMS qty","Price / piece","Value",...(D.phys&&D.phys.j?["Physical (counted)"]:[])],A.slice(0,stkLim).map(x=>{const p=stkPhys(x.part);return[`<b>${esc(x.part)}</b>`,esc(x.name),`<span class="muted">${esc(x.cat)}</span>`,{n:x.qty},{n:rs(x.price)},{n:rs(x.val)},...(D.phys&&D.phys.j?[{n:p?`${p[0]}${p[0]!==x.qty?` <span class="pill ${p[0]<x.qty?"p-r":"p-w"}">${p[0]-x.qty>0?"+":""}${p[0]-x.qty}</span>`:""}<div class="muted" style="font-size:11px">${fd(p[1])}</div>`:"–"}]:[])]}))}
+  ${A.length>stkLim?`<p><button class="btn g s" onclick="stkLim+=500;stk()">Show more (${A.length-stkLim} more)</button></p>`:""}`}
+function stkXls(){const A=stkFilter(stkItems().filter(x=>x.qty>0));const ws=XLSX.utils.aoa_to_sheet([["Part no.","Name","Category","DMS qty","Price / piece","Value"],...A.map(x=>[x.part,x.name,x.cat,x.qty,Math.round(x.price*100)/100,Math.round(x.val)])]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Stock");XLSX.writeFile(wb,`parts-stock-${today()}.xlsx`)}
+async function stkPublish(){const A=stkFilter(stkItems().filter(x=>x.qty>0));if(!A.length)return alert("No parts in the list");if(!FB)return alert("Login is needed to send the list");
+  const t=prompt(`Send ${A.length} parts to staff for counting?\nStaff will see only part no. and name, not the DMS quantity.\nThe previous count list will be replaced.\n\nName for this count:`,`Stock count ${fd(today())}`);if(t===null)return;
+  const id=uid(),items=A.map(x=>[x.part,x.name,x.cat]).sort((a,b)=>(a[2]+a[1]).localeCompare(b[2]+b[1])),CHK=2500,W=[],nC=Math.ceil(items.length/CHK);
+  for(let i=0;i<nC;i++)W.push(["set","stkl","c"+i,{i,list:id,j:JSON.stringify(items.slice(i*CHK,(i+1)*CHK))}]);
+  const old=D.stkl&&D.stkl.info?N(D.stkl.info.chunks):0;for(let i=nC;i<old;i++)W.push(["del","stkl","c"+i]);
+  const info={id,title:t.trim()||"Stock count",date:today(),n:items.length,chunks:nC,at:Date.now(),by:ME};W.push(["set","stkl","info",info]);
+  D.stkl={info,items};save();if(await dbCommit(W)!==false){alert(`✔ List sent: ${items.length} parts. Staff can now log in and count.`);stkV="count";stk()}}
+/* ---- owner: compare counts ---- */
+function stkCounts(){const L=D.stkl&&D.stkl.info;return(D.stkc||[]).filter(c=>c&&c.j).sort((a,b)=>(b.at||0)-(a.at||0)).map(c=>({...c,cur:L&&c.list===L.id}))}
+function stkMap(cs){const m={},x={};cs.forEach(c=>{let j={},e={};try{j=JSON.parse(c.j||"{}")}catch(er){}try{e=JSON.parse(c.x||"{}")}catch(er){}Object.entries(j).forEach(([p,q])=>{if(q===""||q==null)return;m[p]=(m[p]||0)+N(q)});Object.assign(x,e)});return{m,x}}
+function stkCompare(cs,useList){const {m,x}=stkMap(cs),S={};stkItems().forEach(s=>S[s.part]=s);
+  const parts=new Set(Object.keys(m));if(useList&&D.stkl&&D.stkl.items)D.stkl.items.forEach(r=>parts.add(r[0]));
+  const nm={};if(D.stkl&&D.stkl.items)D.stkl.items.forEach(r=>nm[r[0]]=r[1]);
+  return[...parts].map(p=>{const s=S[p],sys=s?s.qty:0,price=s?s.price:0,cnt=p in m?m[p]:null,d=cnt===null?null:cnt-sys;
+    return{part:p,name:(s&&s.name)||nm[p]||x[p]||"",cat:s?s.cat:"",sys,price,cnt,d,dv:d===null?0:d*price,st:cnt===null?"nc":d===0?"ok":d<0?"short":"extra",notDMS:!s}}).sort((a,b)=>Math.abs(b.dv)-Math.abs(a.dv)||a.part.localeCompare(b.part))}
+function stkCountHtml(){const L=D.stkl&&D.stkl.info,C=stkCounts(),cur=C.filter(c=>c.cur);
+  if(!L&&!C.length)return`<div class="card empty" style="margin-top:12px">No count yet. In <b>Stock today</b>, filter the parts you want counted (e.g. price from ₹1,000) and press <b>Send … parts to staff for counting</b>. Then add the employee's login in <b>Staff logins</b>.</div>`;
+  const opts=[...(cur.length>1?[["all",`All staff combined · ${L.title} (${cur.length} people)`]]:[]),...C.map(c=>[c.id,`${stkWho(c)} · ${fd(c.date)} · ${c.n||0} counted · ${c.ok?"accepted":c.done?"submitted":"in progress"}${c.cur?"":" (old list)"}`])];
+  if(!opts.some(o=>o[0]===stkCS))stkCS=opts.length?opts[0][0]:"";
+  const sel=stkCS==="all"?cur:C.filter(c=>c.id===stkCS),useList=sel.length&&sel.every(c=>c.cur);
+  const R=sel.length?stkCompare(sel,useList):[],mt=D.meta&&D.meta.stock;
+  const g=k=>R.filter(r=>r.st===k),sh=g("short"),ex=g("extra"),ok=g("ok"),nc=g("nc");
+  const F=R.filter(r=>stkF==="all"||(stkF==="diff"?r.st==="short"||r.st==="extra":r.st===stkF));
+  const pill={ok:"p-ok",short:"p-r",extra:"p-w",nc:"p-n"},lbl={ok:"✔ Matches",short:"Short",extra:"Extra",nc:"Not counted"};
+  const cDate=sel.length?sel.map(c=>c.date).sort().pop():"";
+  return`<div class="card" style="margin-top:10px">${L?`<b>Current count list:</b> ${esc(L.title)} · ${L.n} parts · sent ${fd(L.date)} <span class="muted">· ${cur.length} employee(s) counting: ${cur.map(c=>`${esc(stkWho(c))} ${c.n||0}/${L.n}${c.done?" ✔":""}`).join(", ")||"nobody yet"}</span>`:"No count list sent yet."}</div>
+  ${opts.length?`<div class="row" style="margin-top:10px"><select onchange="stkCS=this.value;stk()">${opts.map(([v,l])=>`<option value="${esc(v)}" ${v===stkCS?"selected":""}>${esc(l)}</option>`).join("")}</select></div>`:`<p class="muted">Waiting for staff to start counting.</p>`}
+  ${sel.length?`${mt&&cDate&&mt.at!==cDate?`<div class="note" style="margin-top:10px;background:#fff8e6">DMS stock in the app is from <b>${fd(mt.at)}</b> but this count is from <b>${fd(cDate)}</b>. Sales and purchases in between will show as differences. Import the Parts Stock Report of the count day for an exact match.</div>`:""}
+  <div class="grid" style="margin-top:10px"><div class="card stat"><div class="l">Counted</div><div class="n">${R.length-nc.length}</div><div class="s">of ${R.length} parts</div></div><div class="card stat"><div class="l">Matches</div><div class="n pos">${ok.length}</div></div><div class="card stat click" onclick="stkF='short';stk()"><div class="l">Short (less than DMS)</div><div class="n neg">${sh.length}</div><div class="s">${rs(Math.abs(sum(sh,r=>r.dv)))}</div></div><div class="card stat click" onclick="stkF='extra';stk()"><div class="l">Extra (more than DMS)</div><div class="n">${ex.length}</div><div class="s">${rs(sum(ex,r=>r.dv))}</div></div><div class="card stat click" onclick="stkF='nc';stk()"><div class="l">Not counted</div><div class="n">${nc.length}</div></div></div>
+  <div class="row" style="margin-top:10px"><span class="seg">${[["diff","Differences"],["short","Short"],["extra","Extra"],["nc","Not counted"],["ok","Matches"],["all","All"]].map(([v,l])=>`<button class="${stkF===v?"on":""}" onclick="stkF='${v}';stk()">${l}</button>`).join("")}</span>
+   <button class="btn g s" onclick="stkCmpXls()">⬇ Excel</button> ${sel.every(c=>c.ok)?`<span class="pill p-ok">✔ Accepted as actual stock</span>`:`<button class="btn s" onclick="stkAccept()">✓ Accept this count as actual stock</button>`}${stkCS!=="all"?` <button class="btn g s" onclick="stkDelCount('${jsq(stkCS)}')">Delete this count</button>`:""}</div>
+  ${table(["Part no.","Name","DMS qty","Counted","Difference","Value of difference","Result"],F.slice(0,stkLim).map(r=>[`<b>${esc(r.part)}</b>${r.notDMS?` <span class="pill p-w">not in DMS stock</span>`:""}`,esc(r.name),{n:r.sys},{n:r.cnt===null?"–":r.cnt},{n:r.d===null?"":`<span class="${r.d<0?"neg":r.d>0?"":"pos"}">${r.d>0?"+":""}${r.d}</span>`},{n:r.d?`<span class="${r.dv<0?"neg":""}">${rs(r.dv)}</span>`:""},`<span class="pill ${pill[r.st]}">${lbl[r.st]}</span>`]))}
+  ${F.length>stkLim?`<p><button class="btn g s" onclick="stkLim+=500;stk()">Show more</button></p>`:""}
+  <p class="muted">Short = fewer pieces on the shelf than DMS says (missing / sold without bill / wrong entry). Extra = more on the shelf than DMS (purchase not entered / wrong part no.). "Accept" saves the counted quantity as the actual stock; it shows in <b>Stock today</b> next to the DMS quantity. DMS data itself is not changed.</p>`:""}`}
+function stkSelNow(){const C=stkCounts();return stkCS==="all"?C.filter(c=>c.cur):C.filter(c=>c.id===stkCS)}
+function stkCmpXls(){const s=stkSelNow(),R=stkCompare(s,s.every(c=>c.cur));const ws=XLSX.utils.aoa_to_sheet([["Part no.","Name","DMS qty","Counted","Difference","Price / piece","Value of difference","Result"],...R.map(r=>[r.part,r.name,r.sys,r.cnt===null?"":r.cnt,r.d===null?"":r.d,Math.round(r.price*100)/100,Math.round(r.dv),{ok:"Matches",short:"Short",extra:"Extra",nc:"Not counted"}[r.st]])]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Count");XLSX.writeFile(wb,`stock-count-${today()}.xlsx`)}
+async function stkAccept(){const s=stkSelNow();if(!s.length)return;const {m}=stkMap(s),n=Object.keys(m).length,date=s.map(c=>c.date).sort().pop();
+  if(!confirm(`Save the counted quantity of ${n} parts as the actual stock (${fd(date)})?\nAfter this the employee cannot change this count.`))return;
+  const j={...((D.phys&&D.phys.j)||{})};Object.entries(m).forEach(([p,q])=>j[p]=[q,date]);D.phys={date,at:Date.now(),by:ME,j};
+  const W=[["set","meta","phys",D.phys],...s.map(c=>{const o={...c};delete o.cur;o.ok=true;o.okAt=Date.now();return["set","stkc",c.id,o]})];
+  s.forEach(c=>{const o=(D.stkc||[]).find(x=>x.id===c.id);if(o)o.ok=true});save();await dbCommit(W);stk()}
+async function stkDelCount(id){const c=(D.stkc||[]).find(x=>x.id===id);if(!c||!confirm(`Delete the count of ${stkWho(c)} (${fd(c.date)})?`))return;D.stkc=D.stkc.filter(x=>x.id!==id);save();await dbCommit([["del","stkc",id]]);stk()}
+/* ---- owner: staff logins ---- */
+function stkStaffHtml(){const S=D.staff||{},sk=S.stock||[],fn=S.fin||[];
+  return`<div class="card" style="margin-top:10px;max-width:640px"><h3 style="margin-top:0">Create a stock-count login for an employee</h3>
+  <p class="muted">The employee logs in on the same website with this email and password. They see only the stock count page: part no., name and a box to fill the counted pieces. No prices, no DMS quantity, nothing else.</p>
+  <div class="g2"><div><label>Employee name</label><input id="sk_n" placeholder="e.g. Vikas"></div><div><label>Email (login id)</label><input id="sk_e" type="email" placeholder="vikas.de@gmail.com"></div><div><label>Password (min 6 letters)</label><input id="sk_p" type="text" placeholder="password"></div></div>
+  <p><button class="btn" onclick="stkMakeLogin()">Create login</button> <span id="sk_msg"></span></p></div>
+  <div class="card" style="margin-top:10px;max-width:640px"><h3 style="margin-top:0">Stock-count staff</h3>${sk.length?sk.map(e=>`<div class="row" style="justify-content:space-between;margin:4px 0"><span><b>${esc((S.names||{})[e]||"")}</b> ${esc(e)}</span><button class="btn g s" onclick="stkStaffRm('${jsq(e)}')">Remove</button></div>`).join(""):`<p class="muted">Nobody yet.</p>`}
+  <div class="note" style="margin-top:10px"><b>One step in Firebase (needed once after adding or removing someone):</b> open the box below, press <b>Copy</b>, then go to Firebase console → Firestore Database → <b>Rules</b>, replace everything with the copied text and press <b>Publish</b>. Until then the employee will see "Access not given".</div>
+  ${rulesBox(ME,fn.join(", "),sk.join(", "))}</div>`}
+async function stkStaffSave(S){D.staff=S;save();await dbCommit([["set","meta","staff",S]])}
+async function stkMakeLogin(){const n=$("sk_n").value.trim(),e=$("sk_e").value.trim().toLowerCase(),p=$("sk_p").value,msg=h=>$("sk_msg").innerHTML=h;
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))return alert("Enter a proper email");if(p.length<6)return alert("Password needs at least 6 letters");
+  if(e===String(ME).toLowerCase())return alert("This is your own owner login");
+  msg("⏳ Creating…");let made=true;
+  try{const sa=FB.A.initializeApp(fbCfg(),"staff"+Date.now()),au=FB.U.getAuth(sa);try{await FB.U.createUserWithEmailAndPassword(au,e,p);await FB.U.signOut(au)}finally{try{await FB.A.deleteApp(sa)}catch(x){}}}
+  catch(er){const c=(er&&er.code)||"";if(/email-already-in-use/.test(c)){made=false}else{msg("");return alert("Login could not be created ("+(c||er.message)+").\nYou can also make it yourself in Firebase console → Authentication → Users → Add user, then type the same email here and press Create login again.")}}
+  const S={...(D.staff||{})};S.stock=[...new Set([...(S.stock||[]),e])];S.names={...(S.names||{}),[e]:n};await stkStaffSave(S);
+  stk();alert((made?`✔ Login made for ${n||e}.\nEmail: ${e}\nPassword: ${p}\n\n`:`This email already has a login (its old password stays). It is now a stock-count login.\n\n`)+"Last step: copy the Rules text on this page into Firebase → Firestore → Rules and press Publish.")}
+async function stkStaffRm(e){if(!confirm(`Remove ${e} from stock-count staff?\n(Then publish the new Rules text so the login stops working.)`))return;const S={...(D.staff||{})};S.stock=(S.stock||[]).filter(x=>x!==e);await stkStaffSave(S);stk()}
+/* ---- employee (stock staff) screen ---- */
+let SK=null;
+async function stockStaffStart(info){STAFF="stock";try{localStorage.removeItem(KEY)}catch(e){}D=EMPTY();$("nav").innerHTML="";document.querySelectorAll("header .btn.g").forEach(b=>{if(b.id!=="logoutBtn")b.style.display="none"});
+  document.querySelector("header small").textContent="Stock count";screen(`<div class="empty">⏳ Loading the count list…</div>`);
+  try{const {F}=FB,snap=await F.getDocs(C_("stkl"));let items=[];info=null;snap.docs.map(d=>d.data()).filter(x=>x&&x.j).sort((a,b)=>a.i-b.i).forEach(x=>{try{items=items.concat(JSON.parse(x.j))}catch(e){}});
+    const ii=snap.docs.find(d=>d.id==="info");info=ii?ii.data():null;{const seen=new Set();items=items.filter(r=>r&&!seen.has(r[0])&&seen.add(r[0]))}
+    if(!info){SK={info:null};return stkSUI()}
+    const id=sid(info.id+"_"+ME);let mine=null;try{const d=await F.getDoc(R_("stkc",id));mine=d.exists()?d.data():null}catch(e){}
+    let loc={};try{loc=JSON.parse(localStorage.getItem(KEY+"_stc_"+id)||"{}")}catch(e){}
+    let j={},x={};try{j=JSON.parse((mine&&mine.j)||"{}");x=JSON.parse((mine&&mine.x)||"{}")}catch(e){}
+    if(loc.at&&(!mine||loc.at>(mine.at||0))){j=loc.j||j;x=loc.x||x}
+    SK={info,items:items.filter(r=>r&&r[0]),id,j,x,done:!!(mine&&mine.done),ok:!!(mine&&mine.ok),q:"",f:"all",cat:"",lim:150,t:null,name:""};setSync("☁ "+ME);stkSUI()}
+  catch(e){screen(`<h2 style="margin-top:0">Access not given</h2><p><b>${esc(ME)}</b> has no access yet. Ask the owner to add you under Staff logins and publish the Rules.</p><button class="btn" onclick="logout()">Logout</button>`)}}
+const skCnt=()=>Object.values(SK.j).filter(v=>v!==""&&v!=null).length;
+function stkSUI(){if(!SK.info){$("app").innerHTML=`<div class="card empty" style="max-width:560px;margin:20px auto">No stock count list right now. The owner will send one.<p><button class="btn g" onclick="stockStaffStart()">Refresh</button></p></div>`;return}
+  const q=SK.q.trim().toLowerCase(),cats=[...new Set(SK.items.map(r=>r[2]).filter(Boolean))].sort();
+  const A=SK.items.filter(r=>(!q||(r[0]+" "+r[1]).toLowerCase().includes(q))&&(!SK.cat||r[2]===SK.cat)&&(SK.f==="all"||(SK.f==="left"?!(r[0] in SK.j)||SK.j[r[0]]==="":(r[0] in SK.j)&&SK.j[r[0]]!=="")));
+  const n=skCnt(),tot=SK.items.length,ro=SK.ok;
+  $("app").innerHTML=`<div style="max-width:640px;margin:0 auto"><div class="card"><h2 style="margin:0">${esc(SK.info.title)}</h2><div class="muted">${fd(SK.info.date)} · ${tot} parts</div>
+   <div style="background:#eee;border-radius:8px;height:10px;margin:10px 0"><div id="sk_bar" style="background:var(--green);height:10px;border-radius:8px;width:${tot?Math.round(n*100/tot):0}%"></div></div>
+   <b id="sk_n">${n} of ${tot} counted</b> <span id="sk_s" class="muted"></span>
+   ${ro?`<div class="note" style="margin-top:8px">✔ The owner has accepted this count. It cannot be changed now.</div>`:SK.done?`<div class="note" style="margin-top:8px">✔ Submitted. You can still correct a number until the owner accepts it.</div>`:""}
+   <p class="muted" style="margin:8px 0 0">Count the pieces on the shelf and type the number. If a part is not there, type <b>0</b>. The number saves by itself.</p></div>
+  <div class="row" style="margin-top:10px;flex-wrap:wrap"><input placeholder="Search part no. / name" value="${esc(SK.q)}" oninput="SK.q=this.value;SK.lim=150;stkSUI();refocus(this)">
+   <select onchange="SK.cat=this.value;SK.lim=150;stkSUI()"><option value="">All categories</option>${cats.map(c=>`<option ${c===SK.cat?"selected":""}>${esc(c)}</option>`).join("")}</select>
+   <span class="seg">${[["all","All"],["left","Not counted"],["done","Counted"]].map(([v,l])=>`<button class="${SK.f===v?"on":""}" onclick="SK.f='${v}';SK.lim=150;stkSUI()">${l}</button>`).join("")}</span></div>
+  ${A.slice(0,SK.lim).map(r=>`<div class="card" style="margin-top:6px;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px"><div><b>${esc(r[0])}</b><div>${esc(r[1])}</div><div class="muted" style="font-size:12px">${esc(r[2]||"")}</div></div><input type="number" inputmode="numeric" min="0" style="width:90px;font-size:18px;text-align:center" value="${esc(SK.j[r[0]]??"")}" ${ro?"disabled":""} data-p="${esc(r[0])}" oninput="stkSIn(this)"></div>`).join("")||`<p class="muted">Nothing here.</p>`}
+  ${A.length>SK.lim?`<p><button class="btn g" onclick="SK.lim+=200;stkSUI()">Show more (${A.length-SK.lim})</button></p>`:""}
+  ${ro?"":`<div class="card" style="margin-top:12px"><b>Part found on the shelf but not in this list?</b><div class="row" style="margin-top:6px;flex-wrap:wrap"><input id="sk_xp" placeholder="Part no."><input id="sk_xn" placeholder="Name"><input id="sk_xq" type="number" inputmode="numeric" placeholder="Pieces" style="width:90px"><button class="btn s" onclick="stkSAdd()">Add</button></div>
+   ${Object.keys(SK.x).length?`<div style="margin-top:6px">${Object.entries(SK.x).map(([p,nm])=>`<div class="muted">${esc(p)} · ${esc(nm)} · <b>${esc(SK.j[p]??"")}</b> pcs <a href="#" onclick="delete SK.x['${jsq(p)}'];delete SK.j['${jsq(p)}'];stkSSave(true);stkSUI();return false">remove</a></div>`).join("")}</div>`:""}</div>
+  <p style="margin:14px 0 30px"><button class="btn" onclick="stkSSubmit()">✓ ${SK.done?"Submit again":"Count finished – Submit"}</button></p>`}</div>`}
+function stkSIn(el){const p=el.dataset.p,v=el.value.trim();if(v==="")delete SK.j[p];else SK.j[p]=Math.max(0,N(v));const n=skCnt(),tot=SK.items.length;
+  const a=$("sk_n");if(a)a.textContent=`${n} of ${tot} counted`;const b=$("sk_bar");if(b)b.style.width=(tot?Math.round(n*100/tot):0)+"%";stkSSave()}
+function stkSAdd(){const p=$("sk_xp").value.trim().toUpperCase(),nm=$("sk_xn").value.trim(),q=$("sk_xq").value.trim();if(!p||q==="")return alert("Enter the part no. and the pieces");
+  if(SK.items.some(r=>r[0]===p)){SK.j[p]=N(q);SK.q=p}else{SK.x[p]=nm||"?";SK.j[p]=N(q)}stkSSave(true);stkSUI()}
+function stkSSave(now){const doc={id:SK.id,list:SK.info.id,date:today(),by:ME,name:SK.name||"",at:Date.now(),n:skCnt(),done:SK.done,j:JSON.stringify(SK.j),x:JSON.stringify(SK.x)};
+  try{localStorage.setItem(KEY+"_stc_"+SK.id,JSON.stringify({at:doc.at,j:SK.j,x:SK.x}))}catch(e){}
+  const s=$("sk_s");if(s)s.textContent="⏳ saving…";clearTimeout(SK.t);
+  const go=()=>FB.F.setDoc(R_("stkc",SK.id),doc).then(()=>{const s=$("sk_s");if(s)s.textContent="✔ saved";setSync("☁ Saved")},e=>{const s=$("sk_s");if(s)s.innerHTML=`<span class="neg">not saved (${esc(e.code||e.message)}) – kept on this phone</span>`});
+  if(now)return go();SK.t=setTimeout(go,1200)}
+async function stkSSubmit(){const left=SK.items.length-SK.items.filter(r=>r[0] in SK.j).length;
+  if(left&&!confirm(`${left} parts are not counted yet. Submit anyway?`))return;SK.done=true;await stkSSave(true);stkSUI();alert("✔ Submitted. Thank you.")}
+
 /* ================= cloud (Firebase – same project as Deep Honda) ================= */
 /* Paste the Deepanshu Enterprises Firebase config here (keep null to paste it on the device instead) */
 const FB_CONFIG={apiKey:"AIzaSyD2pxvbbNT5uudWBSCYPs_UJB-PecmKkaU",authDomain:"deepanshu-enterprises.firebaseapp.com",projectId:"deepanshu-enterprises",storageBucket:"deepanshu-enterprises.firebasestorage.app",messagingSenderId:"166861238390",appId:"1:166861238390:web:d7ecc448afafcbeaf02f57"};
@@ -1339,7 +1510,7 @@ function fbCfg(){if(FB_CONFIG)return FB_CONFIG;try{return JSON.parse(localStorag
 function parseCfg(t){const o={};String(t||"").replace(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g,(m,k,v)=>{o[k]=v});return o.apiKey&&o.projectId&&o.appId?{apiKey:o.apiKey,authDomain:o.authDomain||"",projectId:o.projectId,storageBucket:o.storageBucket||"",messagingSenderId:o.messagingSenderId||"",appId:o.appId}:null}
 const emList=v=>[...new Set(String(v||"").split(/[,\s;]+/).map(x=>x.trim().toLowerCase()).filter(x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)))];
 const FIN_KEYS=["id","inv","cust","model","vin","co","amt","date","status","doneDate","note","by"];
-function rulesText(v,st){const em=emList(v),sf=emList(st),L=a=>a.map(e=>`'${e}'`).join(", ");return `rules_version = '2';
+function rulesText(v,st,sk){const em=emList(v),sf=emList(st),ks=emList(sk),SKK=['id','list','date','by','name','at','n','done','j','x'],L=a=>a.map(e=>`'${e}'`).join(", ");return `rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Owners: everything
@@ -1364,10 +1535,29 @@ service cloud.firestore {
         && request.resource.data.by == request.auth.token.email
         && request.resource.data.status == 'pending'
         && request.resource.data.keys().hasOnly([${L(FIN_KEYS)}]);
+    }`:""}${ks.length?`
+    // Stock staff: see the count list (part no. + name only), fill only their own count
+    match /shops/${SHOP}/stkl/{id} {
+      allow read: if request.auth != null
+        && request.auth.token.email.lower() in [${L(ks)}];
+    }
+    match /shops/${SHOP}/stkc/{id} {
+      allow read: if request.auth != null
+        && request.auth.token.email.lower() in [${L(ks)}]
+        && (resource == null || resource.data.by == request.auth.token.email);
+      allow create: if request.auth != null
+        && request.auth.token.email.lower() in [${L(ks)}]
+        && request.resource.data.by == request.auth.token.email
+        && request.resource.data.keys().hasOnly([${L(SKK)}]);
+      allow update: if request.auth != null
+        && request.auth.token.email.lower() in [${L(ks)}]
+        && resource.data.by == request.auth.token.email
+        && request.resource.data.by == request.auth.token.email
+        && request.resource.data.keys().hasOnly([${L(SKK)}]);
     }`:""}
   }
 }`}
-function rulesBox(v,st){return `<details style="margin-top:12px"><summary>Firestore Rules – who can open this data</summary><p class="muted">Owners see everything. Staff can only enter finance (invoice, company, amount) and see nothing else. Copy the text into Firebase → Firestore → Rules → Publish.</p><label>Owner emails</label><input id="rulesEm" value="${esc(v)}" oninput="$('rulesOut').value=rulesText(this.value,$('rulesSt').value)"><label style="margin-top:6px">Staff emails (finance entry only)</label><input id="rulesSt" value="${esc(st||"")}" oninput="$('rulesOut').value=rulesText($('rulesEm').value,this.value)"><textarea id="rulesOut" readonly style="min-height:220px;font:12px ui-monospace,Menlo,monospace;margin-top:6px">${esc(rulesText(v,st))}</textarea></details>`}
+function rulesBox(v,st,sk){const u="$('rulesOut').value=rulesText($('rulesEm').value,$('rulesSt').value,$('rulesSk').value)";return `<details style="margin-top:12px"><summary>Firestore Rules – who can open this data</summary><p class="muted">Owners see everything. Finance staff can only enter finance (invoice, company, amount). Stock staff can only fill the stock count. Copy the text into Firebase → Firestore → Rules → Publish.</p><label>Owner emails</label><input id="rulesEm" value="${esc(v)}" oninput="${u}"><label style="margin-top:6px">Staff emails (finance entry only)</label><input id="rulesSt" value="${esc(st||"")}" oninput="${u}"><label style="margin-top:6px">Stock staff emails (stock count only)</label><input id="rulesSk" value="${esc(sk||"")}" oninput="${u}"><textarea id="rulesOut" readonly style="min-height:220px;font:12px ui-monospace,Menlo,monospace;margin-top:6px">${esc(rulesText(v,st,sk))}</textarea><button class="btn s" onclick="const t=$('rulesOut');t.select();navigator.clipboard?navigator.clipboard.writeText(t.value).then(()=>alert('Copied. Paste it in Firebase → Firestore → Rules and press Publish.')):document.execCommand('copy')">Copy</button></details>`}
 function setup(){screen(`<h2 style="margin-top:0">Connect Deepanshu Enterprises database</h2><p class="muted">Firebase → Project settings → Your apps → Web app → copy the whole <b>firebaseConfig = { … }</b> block and paste it here.</p><textarea id="fbIn" rows="8" placeholder="const firebaseConfig = {\n  apiKey: &quot;…&quot;,\n  projectId: &quot;…&quot;, …\n};"></textarea><p><button class="btn" onclick="const c=parseCfg($('fbIn').value);if(!c)return alert('Config incomplete — copy the whole firebaseConfig block.');try{localStorage.setItem(FBK,JSON.stringify(c))}catch(e){}location.reload()">Connect</button></p>${rulesBox("aiashwanimaingi@gmail.com, deepanshumaingi@gmail.com","")}`)}
 const SHOP="deepanshu-enterprises",FBV="12.19.0",DMSK=["vs","vp","sv","pp","ps","rc","stock","acct","snap","wc"],CH=700000;
 let BOOTED=false,FB=null,ME="",VER=null,PARTS={},UNSUB=[];
@@ -1382,7 +1572,7 @@ async function boot(){
     const [A,U,F]=await Promise.all(["app","auth","firestore"].map(m=>import(b+"firebase-"+m+".js")));
     const app=A.initializeApp(fbCfg()),auth=U.getAuth(app);
     let db;try{db=F.initializeFirestore(app,{localCache:F.persistentLocalCache({tabManager:F.persistentMultipleTabManager()})})}catch(e){db=F.getFirestore(app)}
-    FB={U,F,auth,db,app};
+    FB={U,F,auth,db,app,A};
     /* App Check: Firebase may require it for the database (enforced), not only for Gemini — start it before any read */
     try{const AC=await import(b+"firebase-app-check.js");let k=RCK;try{k=localStorage.getItem("de_rck")||RCK}catch(e){}FB.ac=AC.initializeAppCheck(app,{provider:new AC.ReCaptchaEnterpriseProvider(k),isTokenAutoRefreshEnabled:true})}catch(e){console.warn("App Check start failed",e)}
   }catch(e){screen(`<h2 style="margin-top:0">No internet</h2><p>Internet is needed to open the app.</p><button class="btn" onclick="location.reload()">Try again</button>${noData()?"":` <button class="btn g" onclick="setSync('📴 Offline – old copy');nav();render()">See last saved copy</button>`}`);return}
@@ -1402,7 +1592,7 @@ async function logout(){UNSUB.forEach(u=>{try{u()}catch(e){}});UNSUB=[];try{loca
 const R_=(...p)=>FB.F.doc(FB.db,"shops",SHOP,...p),C_=c=>FB.F.collection(FB.db,"shops",SHOP,c);
 async function start(){
   screen(`<div class="empty">⏳ Loading…</div>`);setSync("⏳");
-  try{await FB.F.getDoc(R_("meta","info"))}catch(e){if(/permission-denied/.test(e&&e.code||""))return staffStart();}
+  try{await FB.F.getDoc(R_("meta","info"))}catch(e){if(/permission-denied/.test(e&&e.code||"")){try{await FB.F.getDoc(R_("stkl","info"));return stockStaffStart()}catch(x){}return staffStart()}}
   startOwner()}
 function startOwner(){
   aiCloudLoad();
@@ -1418,6 +1608,11 @@ function startOwner(){
   },cErr));
   UNSUB.push(F.onSnapshot(C_("dupok"),snap=>{const o={};snap.docs.forEach(d=>{o[d.data().key]=1});D.dupok=o;if(!ready.k){ready.k=1;go1()}else refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("chal"),snap=>{const o={};snap.docs.forEach(d=>{const x=d.data();o[x.key]=x});D.chal=o;if(!ready.h){ready.h=1;go1()}else refresh()},cErr));
+  UNSUB.push(F.onSnapshot(C_("stkl"),snap=>{let info=null,items=[];snap.docs.map(d=>[d.id,d.data()]).sort((a,b)=>N(a[1].i)-N(b[1].i)).forEach(([id,x])=>{if(id==="info")info=x;else if(x&&x.j)try{items=items.concat(JSON.parse(x.j))}catch(e){}});D.stkl=info?{info,items}:null;if(BOOTED&&tab==="stk")refresh()},cErr));
+  UNSUB.push(F.onSnapshot(C_("stkc"),snap=>{D.stkc=snap.docs.map(d=>d.data());if(BOOTED&&tab==="stk")refresh()},cErr));
+  UNSUB.push(F.onSnapshot(R_("meta","staff"),d=>{D.staff=d.exists()?d.data():{};if(BOOTED&&tab==="stk")refresh()},cErr));
+  UNSUB.push(F.onSnapshot(R_("meta","jr"),d=>{D.jr=d.exists()?d.data():{};if(BOOTED&&tab==="jr")refresh()},cErr));
+  UNSUB.push(F.onSnapshot(R_("meta","phys"),d=>{D.phys=d.exists()?d.data():{};if(BOOTED&&tab==="stk")refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("emp"),snap=>{D.emp=snap.docs.map(d=>d.data());if(BOOTED)refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("att"),snap=>{const o={};snap.docs.forEach(d=>{const x=d.data();if(x&&x.m)o[x.m]=x});D.att=o;if(BOOTED)refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("wsd"),snap=>{const o={};snap.docs.forEach(d=>{const x=d.data();if(x&&x.date)o[x.date]=x});D.wsd=o;if(BOOTED)refresh()},cErr));
@@ -1470,7 +1665,7 @@ async function cloudRecover(){const ks=Object.keys(CC).filter(k=>!dmsHave(k));if
 async function curMeta(){try{const s=await FB.F.getDoc(R_("meta","info"));return s.exists()?s.data():{}}catch(e){return{}}}
 function cPut(c,id,obj){if(!FB)return;setSync("⏳ Saving…");FB.F.setDoc(R_(c,sid(id)),{...obj,by:obj.by||ME}).then(()=>setSync("☁ Synced · "+ME),cErr)}
 function cDel(c,id){if(!FB)return;setSync("⏳ Saving…");FB.F.deleteDoc(R_(c,sid(id))).then(()=>setSync("☁ Synced · "+ME),cErr)}
-function cErr(e){const c=(e&&e.code)||"";if(/permission-denied/.test(c)){UNSUB.forEach(u=>{try{u()}catch(x){}});UNSUB=[];screen(`<h2 style="margin-top:0">Access not given</h2><p><b>${esc(ME)}</b> cannot open this data yet. Add this email in Firebase → Firestore → Rules.</p>${rulesBox(ME,"")}<button class="btn" onclick="logout()">Logout</button>`);return}setSync("⚠ "+(c||e.message||e))}
+function cErr(e){const c=(e&&e.code)||"";if(/permission-denied/.test(c)){UNSUB.forEach(u=>{try{u()}catch(x){}});UNSUB=[];screen(`<h2 style="margin-top:0">Access not given</h2><p><b>${esc(ME)}</b> cannot open this data yet. Add this email in Firebase → Firestore → Rules.</p>${rulesBox(ME,((D.staff||{}).fin||[]).join(", "),((D.staff||{}).stock||[]).join(", "))}<button class="btn" onclick="logout()">Logout</button>`);return}setSync("⚠ "+(c||e.message||e))}
 let _rT=0;function refresh(){clearTimeout(_rT);_rT=setTimeout(refresh_,200)}
 function refresh_(){if(dlg.open)return;const a=document.activeElement;if(a&&/INPUT|SELECT|TEXTAREA/.test(a.tagName)&&$("app").contains(a))return;nav();render()}
 function saveColl(no){const v={no,date:$("m_d").value,amt:N($("m_a").value),mode:$("m_m").value};D.coll[no]=v;save();cPut("coll",no,v);dlg.close();nav();render()}
