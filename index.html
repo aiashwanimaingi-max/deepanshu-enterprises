@@ -2124,10 +2124,11 @@ if(typeof window!=="undefined")(function(){const W={importFiles:"Import DMS file
   Object.entries(I).forEach(([n,where])=>{const f=window[n];if(typeof f!=="function")return;window[n]=async function(inp,...a){const fl=inp&&inp.files&&inp.files[0];if(!fl)return f.call(this,inp,...a);const L=await dupFilter([fl],where);if(!L.length){try{inp.value=""}catch(e){}return}return f.call(this,inp,...a)}})})();
 /* keep the page where it is when a screen is redrawn (no jump to top while marking attendance etc.) */
 (function(){let depth=0;const inner=()=>[...document.querySelectorAll("#app .tw, #app [data-keep]")];
-  const keep=f=>function(...a){if(depth)return f.apply(this,a);depth++;const y=window.scrollY||0,T=inner().map(e=>[e.scrollTop,e.scrollLeft]);let r;
+  const TABOF={att:"att",wsk:"ws",stk:"stk",dbk:"dbk",daily:"daily",jry:"jr",money:"money",oldb:"oldb",fin:"fin",veh:"veh",svc:"svc",acc:"acc",col:"col",parts:"parts",dash:"dash",imp:"imp",wcl:"wcl",rep:"rep"};
+  const keep=(f,n)=>function(...a){if(depth)return f.apply(this,a);if(TABOF[n]&&typeof tab!=="undefined"&&tab!==TABOF[n]&&n!=="render")return window.render();depth++;const y=window.scrollY||0,T=inner().map(e=>[e.scrollTop,e.scrollLeft]);let r;
     try{r=f.apply(this,a)}finally{depth--}
     if(!_jump){const put=late=>{if(y&&(late?(window.scrollY||0)<1:Math.abs((window.scrollY||0)-y)>1))scrollTo(0,y);inner().forEach((e,i)=>{if(T[i]&&(!late||(e.scrollTop<1&&e.scrollLeft<1))){if(e.scrollTop!==T[i][0])e.scrollTop=T[i][0];if(e.scrollLeft!==T[i][1])e.scrollLeft=T[i][1]}})};put(false);requestAnimationFrame(()=>put(true))}return r};
-  ["render","rep","att","wsk","stk","dbk","daily","jry","money","oldb","fin","veh","svc","acc","col","parts","dash","imp","wcl"].forEach(n=>{try{if(typeof window[n]==="function")window[n]=keep(window[n])}catch(e){}})})();
+  ["render","rep","att","wsk","stk","dbk","daily","jry","money","oldb","fin","veh","svc","acc","col","parts","dash","imp","wcl"].forEach(n=>{try{if(typeof window[n]==="function")window[n]=keep(window[n],n)}catch(e){}})})();
 boot();
 </script>
 </body>
