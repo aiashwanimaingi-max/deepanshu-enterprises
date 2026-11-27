@@ -67,7 +67,7 @@ dialog .bd{padding:16px;max-height:80vh;overflow:auto}
 <script>
 /* ================= data ================= */
 const KEY="deepanshuHeroDMS_v2";
-const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},fin:[],finpay:[],snap:{},wc:{},areg:[],dupok:{},meta:{},chal:{},old:[],dbk:[],emp:[],att:{},wsd:{},stkl:null,stkc:[],staff:{},phys:{},jr:{}});
+const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},fin:[],finpay:[],snap:{},wc:{},areg:[],dupok:{},meta:{},chal:{},old:[],dbk:[],emp:[],att:{},wsd:{},stkl:null,stkc:[],staff:{},phys:{},jr:{},inc:{}});
 let D=EMPTY();
 try{const s=localStorage.getItem(KEY);if(s)D=Object.assign(EMPTY(),JSON.parse(s))}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){alert("Browser storage is full or blocked. Take a Backup file.")}}
@@ -117,7 +117,8 @@ function aggregate(type,rows){
   if(type==="vs")rows.forEach(r=>{const no=g(r,"Invoice No"),vin=String(g(r,"Vin No.")).trim();if(!no||!vin)return;const k=no+"|"+vin;const o=out[k]||(out[k]={no,vin,date:pDate(g(r,"Invoice Date")),cust:cname(g(r,"Customer Name"),g(r,"Customer Code")),code:String(g(r,"Customer Code")).trim(),model:String(g(r,"Model")).trim(),variant:g(r,"Variant"),cat:g(r,"Product Category"),value:N(g(r,"Value")),bill:N(g(r,"Bill Amount")),disc:N(g(r,"Line Item Discount"))+N(g(r,"Header Discount")),open:true});if(String(g(r,"Invoice Status")).trim()==="Cancelled")o.open=false});
   if(type==="vp")rows.forEach(r=>{const vin=String(g(r,"Vin No")).trim();if(!vin)return;out[vin+"|"+g(r,"Invoice Number")]={vin,date:pDate(g(r,"Stock In Date"))||pDate(g(r,"Invoice Date")),inv:g(r,"Invoice Number"),model:String(g(r,"Model")).trim(),desc:g(r,"SKU Description"),sup:cname(g(r,"Supplier Name"),g(r,"Supplier Code")),taxable:N(g(r,"Assessable Value")),cost:N(g(r,"Assessable Value"))+N(g(r,"CGST Amt"))+N(g(r,"SGST/UTGST Amt"))+N(g(r,"IGST Amt"))+N(g(r,"TCS Amt"))+N(g(r,"Cess Amt"))}});
   if(type==="sv")rows.forEach(r=>{const no=g(r,"Invoice Number");if(!no)return;const o=out[no]||(out[no]={no,date:pDate(g(r,"Invoice Date")),jc:g(r,"Narration"),jt:String(g(r,"Job Card Type")).trim(),it:String(g(r,"Invoice Type")).trim(),cust:cname(g(r,"Customer Name"),g(r,"Customer Code")),labour:0,parts:0,lines:0,total:N(g(r,"Round Off Amount")),open:true,model:""});if(String(g(r,"Invoice Status")).trim()==="Cancelled"){o.open=false;return}
-    const amt=N(g(r,"Retail Amount"));if(String(g(r,"JOB/PART")).trim()==="Job"){o.labour+=amt;const m=String(g(r,"SKU Name")).split("-").pop().trim();if(!o.model&&m&&m.length<25)o.model=m}else o.parts+=amt;o.lines+=amt});
+    const amt=N(g(r,"Retail Amount"));if(String(g(r,"JOB/PART")).trim()==="Job"){o.labour+=amt;const m=String(g(r,"SKU Name")).split("-").pop().trim();if(!o.model&&m&&m.length<25)o.model=m}else{o.parts+=amt;const nm=String(g(r,"SKU Name")||g(r,"Part Description")||g(r,"Part Name")||"").trim();if(nm){const qk=Object.keys(r).find(k=>/^(qty|quantity|billed ?qty|issued ?qty|part ?qty)$/i.test(k.trim()));(o.pl||(o.pl=[])).push([nm.slice(0,45),qk?N(r[qk])||1:1])}}
+    if(!o.mech){const mk=Object.keys(r).find(k=>/techni|mechanic/i.test(k));if(mk&&String(r[mk]).trim())o.mech=String(r[mk]).trim()}o.lines+=amt});
   if(type==="sv")V(out).forEach(o=>{if(!o.total||Math.abs(o.total-o.lines)>Math.max(5,o.lines*.05))o.total=Math.round(o.lines);delete o.lines});
   if(type==="pp")rows.forEach(r=>{const no=g(r,"Invoice Number");if(!no)return;const o=out[no]||(out[no]={no,date:pDate(g(r,"GRN Date"))||pDate(g(r,"Invoice Date")),sup:cname(g(r,"Supplier Name"),g(r,"Supplier Code")),total:N(g(r,"Invoice Value")),lines:0,cats:{}});const c=g(r,"Product Category")||"Other";o.cats[c]=(o.cats[c]||0)+N(g(r,"Net Taxable Value"));o.lines++});
   if(type==="ps")rows.forEach(r=>{const no=g(r,"Invoice Number");if(!no)return;const o=out[no]||(out[no]={no,date:pDate(g(r,"Invoice Date")),cust:cname(g(r,"Customer Name"),g(r,"Customer Code")),total:N(g(r,"Total Invoice Amount")),it:g(r,"Invoice Type"),open:true,cats:{}});if(String(g(r,"Invoice Status")).trim()==="Cancelled")o.open=false;const c=g(r,"Product Category")||"Other";o.cats[c]=(o.cats[c]||0)+N(g(r,"Assessable Value"))});
@@ -160,7 +161,7 @@ function cols(items,fmt){const mx=Math.max(1,...items.map(x=>x[1]));return `<div
 function groupSum(a,kf,vf){const o={};a.forEach(x=>{const k=kf(x)||"Other";o[k]=(o[k]||0)+vf(x)});return Object.entries(o).sort((a,b)=>b[1]-a[1])}
 
 /* ================= views ================= */
-const TABS={dash:"Dashboard",daily:"Daily",fin:"Finance",veh:"Vehicles",svc:"Service",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",stk:"📦 Stock",money:"Money & Expenses",dbk:"📷 Day Book",ws:"🔧 Workshop",jr:"🎟 Joyride",att:"🕘 Attendance",oldb:"Old bikes",imp:"Import DMS files"};
+const TABS={dash:"Dashboard",daily:"💰 Daily",fin:"Finance",veh:"Vehicles",svc:"Service",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",stk:"📦 Stock",money:"Money & Expenses",dbk:"📷 Day Book",ws:"🔧 Workshop",jr:"🎟 Joyride",att:"🕘 Attendance",oldb:"Old bikes",imp:"Import DMS files"};
 let tab=(()=>{try{const t=sessionStorage.getItem("de_rt");sessionStorage.removeItem("de_rt");return t||"dash"}catch(e){return"dash"}})();
 function nav(){const dn=dupScan().length;$("nav").innerHTML=Object.entries(dn?{...TABS,dup:"⚠ Duplicates"}:TABS).map(([k,v])=>`<button class="${k===tab?"on":""}" onclick="go('${k}')">${v}${k==="dup"?` <span class="pill p-r">${dn}</span>`:""}${k==="col"&&pending().length?` <span class="pill p-r">${pending().length}</span>`:""}</button>`).join("")}
 function go(t){tab=t;nav();render();scrollTo(0,0)}
@@ -331,9 +332,63 @@ async function readSnapshot(file){
   return{kind,dealer,rows};
 }
 let dDay="",dKind="";
+
+/* ---------- Day money: what came in on a day / range (DMS vs Workshop sheet vs Day Book) ---------- */
+let dmV="money",dmF="",dmT="";
+function dmDay(r){const S=sales(r),SV=services(r),PS=V(D.ps).filter(p=>p.open&&inR(p.date,r)),SN=V(D.snap).filter(x=>inR(x.date,r));
+  const WD=Object.values(D.wsd||{}).filter(d=>inR(d.date,r)),DBK=(D.dbk||[]).filter(x=>inR(x.date,r)),EX=D.exp.filter(x=>inR(x.date,r));
+  const jobs=WD.flatMap(d=>d.jobs||[]),cnt=WD.flatMap(d=>d.counter||[]),upd=WD.flatMap(d=>d.updates||[]),wex=WD.flatMap(d=>d.expenses||[]);
+  const ds=DBK.filter(x=>x.kind==="sale"),dos=DBK.filter(x=>x.kind==="oldsale");
+  const snK=k=>SN.filter(x=>new RegExp(k,"i").test(x.kind||""));
+  const o={
+   vs:{n:new Set(S.map(x=>x.no)).size,amt:sum(S,x=>N(x.bill)),snap:sum(snK("veh"),x=>x.amt),snapN:snK("veh").length},
+   sv:{n:SV.length,amt:sum(SV,x=>N(x.total)),cash:sum(SV.filter(x=>x.it!=="Credit"),x=>N(x.total)),credit:sum(SV.filter(x=>x.it==="Credit"),x=>N(x.total)),snap:sum(snK("serv"),x=>x.amt),snapN:snK("serv").length},
+   ps:{n:PS.length,amt:sum(PS,x=>N(x.total)),snap:sum(snK("part"),x=>x.amt),snapN:snK("part").length},
+   ws:{days:WD.length,jobOn:sum(jobs,j=>N(j.online)),jobCash:sum(jobs,j=>N(j.cash)),cOn:sum(cnt,x=>N(x.online)),cCash:sum(cnt,x=>N(x.cash)),uOn:sum(upd,x=>N(x.online)),uCash:sum(upd,x=>N(x.cash)),ex:sum(wex,x=>N(x.amt))},
+   db:{n:ds.length,cash:sum(ds,x=>N(x.amt)),online:sum(ds,x=>N(x.online)),fin:sum(ds,x=>N(x.finAmt)),old:sum(ds,x=>N(x.oldPrice)),oCash:sum(dos,x=>N(x.amt)),oOn:sum(dos,x=>N(x.online))},
+   ex:{inn:sum(EX.filter(x=>x.type==="in"&&x.src!=="ws"),x=>N(x.amt)),out:sum(EX.filter(x=>x.type==="out"&&x.src!=="ws"),x=>N(x.amt)),outCash:sum(EX.filter(x=>x.type==="out"&&x.src!=="ws"&&/cash/i.test(x.mode||"Cash")),x=>N(x.amt))}};
+  o.ws.on=o.ws.jobOn+o.ws.cOn+o.ws.uOn;o.ws.cash=o.ws.jobCash+o.ws.cCash+o.ws.uCash;o.ws.net=o.ws.cash-o.ws.ex;
+  o.cashIn=o.ws.cash+o.db.cash+o.db.oCash;o.onlineIn=o.ws.on+o.db.online+o.db.oOn;o.cashHand=o.cashIn-o.ws.ex-o.ex.outCash;return o}
+function dmRange(){const t=today();if(!dmF)dmF=t;if(!dmT)dmT=dmF;if(dmT<dmF)dmT=dmF;return[dmF,dmT]}
+function dmSet(k){const t=new Date(),iso_=d=>iso(d);if(k==="t"){dmF=dmT=iso_(t)}else if(k==="y"){t.setDate(t.getDate()-1);dmF=dmT=iso_(t)}else if(k==="m"){dmT=iso_(t);dmF=dmT.slice(0,8)+"01"}else if(k==="w"){dmT=iso_(t);t.setDate(t.getDate()-6);dmF=iso_(t)}daily()}
+function dmShift(n){const a=new Date(dmF+"T00:00");a.setDate(a.getDate()+n);dmF=dmT=iso(a);daily()}
+function dayMoney(){const r=dmRange(),o=dmDay(r),one=r[0]===r[1],lbl=one?fd(r[0]):`${fd(r[0])} – ${fd(r[1])}`;
+  const chk=(a,b,okTxt)=>!b&&!a?"":Math.abs(a-b)<1?`<span class="pill p-ok">✔ ${okTxt||"matches"}</span>`:`<span class="pill ${a<b?"p-r":"p-w"}">${a<b?"Short":"Extra"} ${rs(Math.abs(a-b))}</span>`;
+  const line=(l,v,cls)=>`<div class="row" style="justify-content:space-between;margin:3px 0"><span>${l}</span><b class="${cls||""}">${v}</b></div>`;
+  const svRecv=o.ws.jobOn+o.ws.jobCash,cntRecv=o.ws.cOn+o.ws.cCash,vsRecv=o.db.cash+o.db.online+o.db.fin+o.db.old;
+  const days=[];if(!one){for(let d=new Date(r[0]+"T00:00");iso(d)<=r[1]&&days.length<62;d.setDate(d.getDate()+1))days.push(iso(d))}
+  return`<div class="row" style="flex-wrap:wrap"><label style="margin:0">From</label><input type="date" value="${r[0]}" onchange="dmF=this.value;if(dmT<dmF)dmT=dmF;daily()" style="width:auto"><label style="margin:0">to</label><input type="date" value="${r[1]}" onchange="dmT=this.value;daily()" style="width:auto">
+   <span class="seg">${[["t","Today"],["y","Yesterday"],["w","Last 7 days"],["m","This month"]].map(([k,l])=>`<button onclick="dmSet('${k}')">${l}</button>`).join("")}</span>
+   ${one?`<button class="btn g s" onclick="dmShift(-1)">‹ Previous day</button><button class="btn g s" onclick="dmShift(1)">Next day ›</button>`:""}</div>
+  <h2 style="margin-bottom:4px">Money for ${lbl}</h2>
+  <div class="grid"><div class="card stat"><div class="l">Cash received</div><div class="n pos">${rs(o.cashIn)}</div><div class="s">workshop ${rs(o.ws.cash)} · sales ${rs(o.db.cash+o.db.oCash)}</div></div>
+   <div class="card stat"><div class="l">Online / account</div><div class="n">${rs(o.onlineIn)}</div><div class="s">workshop ${rs(o.ws.on)} · sales ${rs(o.db.online+o.db.oOn)}</div></div>
+   <div class="card stat"><div class="l">Finance (to come from company)</div><div class="n">${rs(o.db.fin)}</div><div class="s">old bikes taken ${rs(o.db.old)}</div></div>
+   <div class="card stat"><div class="l">Cash expenses</div><div class="n neg">${rs(o.ws.ex+o.ex.outCash)}</div><div class="s">workshop ${rs(o.ws.ex)} · other ${rs(o.ex.outCash)}</div></div>
+   <div class="card stat"><div class="l">Cash in hand (should be)</div><div class="n ${o.cashHand<0?"neg":"pos"}">${rs(o.cashHand)}</div><div class="s">cash received − cash expenses</div></div></div>
+  <div class="g2" style="margin-top:12px">
+   <div class="card"><h3 style="margin-top:0">🔧 Service</h3>
+    ${line("DMS service bills",`${o.sv.n} · ${rs(o.sv.amt)}`)}${line("&nbsp;&nbsp;cash bills / credit bills",`${rs(o.sv.cash)} / ${rs(o.sv.credit)}`,"muted")}${o.sv.snapN?line("DMS Service Snapshot",`${o.sv.snapN} · ${rs(o.sv.snap)}`,"muted"):""}
+    ${line("Workshop sheet: job cards",`online ${rs(o.ws.jobOn)} · cash ${rs(o.ws.jobCash)}`)}${line("Received vs DMS cash bills",chk(svRecv,o.sv.cash))}
+    ${o.ws.uOn+o.ws.uCash?line("Workshop sheet: updates (old jobs)",rs(o.ws.uOn+o.ws.uCash),"muted"):""}
+    ${line("Workshop expenses",rs(o.ws.ex),"neg")}${line("Workshop cash in hand",rs(o.ws.net))}
+    ${o.ws.days?"":`<div class="note" style="margin-top:6px">No workshop sheet saved for this ${one?"day":"period"}. Upload it in <a href="#" onclick="go('ws');return false">Workshop</a>.</div>`}
+    ${o.sv.n?"":`<div class="note" style="margin-top:6px">No DMS service bills for this ${one?"day":"period"}. Import today's Service snapshot / Service file in <a href="#" onclick="go('imp');return false">Import DMS files</a>.</div>`}</div>
+   <div class="card"><h3 style="margin-top:0">🏍 Vehicle sales</h3>
+    ${line("DMS vehicle bills",`${o.vs.n} · ${rs(o.vs.amt)}`)}${o.vs.snapN?line("DMS Vehicle Snapshot",`${o.vs.snapN} · ${rs(o.vs.snap)}`,"muted"):""}
+    ${line("Day Book: bikes",o.db.n)}${line("&nbsp;&nbsp;cash",rs(o.db.cash))}${line("&nbsp;&nbsp;online / account",rs(o.db.online))}${line("&nbsp;&nbsp;finance",rs(o.db.fin))}${line("&nbsp;&nbsp;old bike taken",rs(o.db.old))}
+    ${line("Day Book total vs DMS bills",chk(vsRecv,o.vs.amt,"covers DMS bills"))}
+    ${o.db.oCash+o.db.oOn?line("Old bikes sold",rs(o.db.oCash+o.db.oOn)):""}
+    ${o.db.n?"":`<div class="note" style="margin-top:6px">No Day Book page saved for this ${one?"day":"period"}. Add it in <a href="#" onclick="go('dbk');return false">Day Book</a>.</div>`}
+    <p class="muted" style="font-size:12px;margin-bottom:0">Day Book often has part payments (booking, balance), so it need not equal the DMS bills of the same day.</p></div>
+   <div class="card"><h3 style="margin-top:0">🧰 Counter parts</h3>${line("DMS counter bills",`${o.ps.n} · ${rs(o.ps.amt)}`)}${o.ps.snapN?line("DMS Parts Snapshot",`${o.ps.snapN} · ${rs(o.ps.snap)}`,"muted"):""}${line("Workshop sheet counter sale",rs(cntRecv))}${line("Payment vs DMS",chk(cntRecv,o.ps.amt))}</div>
+   <div class="card"><h3 style="margin-top:0">💰 Other money (Money & Expenses)</h3>${line("Money in",rs(o.ex.inn),"pos")}${line("Expenses / payments",rs(o.ex.out),"neg")}${line("&nbsp;&nbsp;of which cash",rs(o.ex.outCash),"muted")}</div></div>
+  ${days.length?`<h2>Day by day</h2>${table(["Date","Service DMS","Workshop received","Counter DMS / sheet","Vehicle DMS","Day Book (cash+online)","Cash in hand"],days.map(d=>{const x=dmDay([d,d]);return[`<a href="#" onclick="dmF=dmT='${d}';daily();return false">${fd(d)}</a>`,{n:x.sv.amt?rs(x.sv.amt):""},{n:x.ws.days?rs(x.ws.jobOn+x.ws.jobCash):`<span class="muted">no sheet</span>`},{n:x.ps.amt||x.ws.cOn+x.ws.cCash?`${rs(x.ps.amt)} / ${rs(x.ws.cOn+x.ws.cCash)}`:""},{n:x.vs.amt?rs(x.vs.amt):""},{n:x.db.n?rs(x.db.cash+x.db.online):""},{n:x.cashIn?rs(x.cashHand):""}]}).reverse())}`:""}`}
 function daily(){
+  const seg=`<div class="row"><span class="seg"><button class="${dmV==="money"?"on":""}" onclick="dmV='money';daily()">💰 Day money</button><button class="${dmV==="snap"?"on":""}" onclick="dmV='snap';daily()">DMS snapshot bills</button></span></div>`;
+  if(dmV==="money"){$("app").innerHTML=seg+dayMoney();return}
   const all=V(D.snap);
-  if(!all.length){$("app").innerHTML=`<div class="card" style="text-align:center;padding:36px"><h2 style="margin-top:0">Daily Snapshot</h2><p class="muted">DMS export the daily Snapshot report (Parts / Vehicle / Service) and add it in <b>Import DMS files</b> . Each day will show here.</p><button class="btn" onclick="go('imp')">Import</button></div>`;return}
+  if(!all.length){$("app").innerHTML=seg+`<div class="card" style="text-align:center;padding:36px"><h2 style="margin-top:0">Daily Snapshot</h2><p class="muted">DMS export the daily Snapshot report (Parts / Vehicle / Service) and add it in <b>Import DMS files</b> . Each day will show here.</p><button class="btn" onclick="go('imp')">Import</button></div>`;return}
   const days=[...new Set(all.map(x=>x.date))].sort();if(!dDay||!days.includes(dDay))dDay=days[days.length-1];
   const kinds=[...new Set(all.map(x=>x.kind))];
   const D0=all.filter(x=>x.date===dDay&&(!dKind||x.kind===dKind)),prevDay=days[days.indexOf(dDay)-1];
@@ -342,7 +397,7 @@ function daily(){
   const amt=sum(D0,x=>x.amt),pa=sum(P0,x=>x.amt),ch=pa?Math.round((amt-pa)/pa*100):null;
   const pdi=D0.filter(x=>x.pdi),free=pdi.filter(x=>x.disc>0);
   const last=days.slice(-14).map(d=>[new Date(d+"T00:00").getDate()+"",sum(all.filter(x=>x.date===d&&(!dKind||x.kind===dKind)),x=>x.amt)]);
-  $("app").innerHTML=`<div class="row"><input type="date" value="${dDay}" min="${days[0]}" max="${days[days.length-1]}" onchange="dDay=this.value;daily()">
+  $("app").innerHTML=seg+`<div class="row"><input type="date" value="${dDay}" min="${days[0]}" max="${days[days.length-1]}" onchange="dDay=this.value;daily()">
   <button class="btn g s" ${days.indexOf(dDay)>0?"":"disabled"} onclick="dDay='${prevDay||""}';daily()">‹ Previous day</button><button class="btn g s" ${days.indexOf(dDay)<days.length-1?"":"disabled"} onclick="dDay='${days[days.indexOf(dDay)+1]||""}';daily()">Next day ›</button>
   <select onchange="dKind=this.value;daily()"><option value="">All snapshots</option>${kinds.map(k=>`<option ${k===dKind?"selected":""}>${esc(k)}</option>`).join("")}</select></div>
   ${days.includes(dDay)?"":`<div class="note">${fd(dDay)} snapshot has not been imported.</div>`}
@@ -1274,8 +1329,9 @@ async function atPSave(){const L=ATR.filter(r=>r.inc&&r.map!=="skip");if(!L.leng
     const doc=docs[r.m]||(docs[r.m]=D.att[r.m]||(D.att[r.m]={m:r.m,d:{},paidLeaves:N((D.att[atPrevM(r.m)]||{}).paidLeaves)}));doc.d=doc.d||{};doc.d[id]=doc.d[id]||{};Object.entries(r.days).forEach(([d,v])=>doc.d[id][String(+d)]=v)}
   Object.values(docs).forEach(doc=>W.push(["set","att",doc.m,doc]));save();if(!await dbCommit(W))return;atMon=L[0].m;ATR=null;atPh="✔ Attendance save done";atView="month";att()}
 function att(){if(!atDay)atDay=today();if(!atMon)atMon=today().slice(0,7);const E=atEmps();
-  const tabs=`<div class="row"><span class="seg">${[["day","Today Attendance"],["month","Month + salary"],["photo","📷 Attendance register Photo"],["emp","Employees"]].map(([v,l])=>`<button class="${atView===v?"on":""}" onclick="atView='${v}';att()">${l}</button>`).join("")}</span></div>`;
+  const tabs=`<div class="row"><span class="seg">${[["day","Today Attendance"],["month","Month + salary"],["inc","💸 Incentive"],["photo","📷 Attendance register Photo"],["emp","Employees"]].map(([v,l])=>`<button class="${atView===v?"on":""}" onclick="atView='${v}';att()">${l}</button>`).join("")}</span></div>`;
   if(!D.emp.length&&atView!=="photo"&&atView!=="emp"){$("app").innerHTML=tabs+`<div class="card" style="text-align:center;padding:30px"><h2 style="margin-top:0">Add employees first</h2><p class="muted">Enter names and monthly salary, or upload a register photo and names are created automatically.</p><button class="btn" onclick="empForm()">+ Employee</button> <button class="btn g" onclick="atView='photo';att()">📷 Register photo</button></div>`;return}
+  if(atView==="inc"){$("app").innerHTML=tabs+incHtml();return}
   if(atView==="emp"){$("app").innerHTML=tabs+`<div class="row"><button class="btn" onclick="empForm()">+ Employee</button></div>${table(["Name","Role","Salary","Status",""],D.emp.slice().sort((a,b)=>(a.ord||0)-(b.ord||0)).map(e=>[`<b>${esc(e.name)}</b>`,esc(e.role||""),{n:e.salary?rs(e.salary):`<span class="neg">Enter</span>`},e.active===false?`<span class="pill p-n">Left</span>`:`<span class="pill p-ok">Working</span>`,`<button class="btn g s" onclick="empForm('${jsq(e.id)}')">Edit</button>`]))}`;return}
   if(atView==="day"){const m=atDay.slice(0,7),d=+atDay.slice(8,10),cnt=k=>E.filter(e=>{const v=atGet(m,e.id,d);return k==="P"?v[0]==="P":k==="X"?!v:v===k}).length;
     const sat=atSat(m,d);$("app").innerHTML=tabs+`${sat?`<div class="note" style="margin-bottom:8px"><b>Saturday – off day.</b> Mark <b>Present</b> only for those who came today; they get the Saturday extra in their salary. Nobody else needs to be marked.</div>`:""}<div class="row"><input type="date" value="${atDay}" onchange="atDay=this.value;att()" style="width:auto">${sat?"":`<button class="btn g" onclick="atAllP()">Mark rest Present</button>`}
@@ -1290,12 +1346,12 @@ function att(){if(!atDay)atDay=today();if(!atMon)atMon=today().slice(0,7);const 
     ${ATR.map((r,i)=>`<tr><td><input type="checkbox" style="width:auto" ${r.inc?"checked":""} onchange="ATR[${i}].inc=this.checked"></td><td><b>${esc(r.name)}</b></td><td><select style="width:auto" onchange="ATR[${i}].map=this.value;att()"><option value="new" ${r.map==="new"?"selected":""}>+ New employee</option><option value="skip" ${r.map==="skip"?"selected":""}>Skip</option>${D.emp.map(e=>`<option value="${esc(e.id)}" ${r.map===e.id?"selected":""}>${esc(e.name)}</option>`).join("")}</select></td>
       ${Array.from({length:dim},(_,k)=>{const d=k+1,v=r.days[d]||"",o=r.map!=="new"&&r.map!=="skip"?atGet(r.m,r.map,d):"",cf=o&&v&&o!==v;return`<td style="padding:2px;text-align:center"><span class="pill ${atCls(v)}" style="cursor:pointer;${cf?"outline:2px solid var(--amber)":""}" title="${cf?"Earlier: "+esc(atLbl(o)):""}" onclick="atPCycle(${i},${d})">${atLbl(v)}</span></td>`}).join("")}</tr>`).join("")}</table></div>
     <div class="row" style="margin-top:10px"><button class="btn" onclick="atPSave()">✓ Attendance Save </button><button class="btn g" onclick="ATR=null;atPh='';att()">✕ Cancel</button></div>`;return}
-  const m=atMon,dim=atDim(m),doc=D.att[m]||{},R=E.map(e=>({e,c:atCalc(m,e)}));
+  const m=atMon,dim=atDim(m),doc=D.att[m]||{},IT=incTotals(m),R=E.map(e=>({e,c:atCalc(m,e),inc:IT[e.id]||0}));
   $("app").innerHTML=tabs+`<div class="row"><input type="month" value="${m}" onchange="atMon=this.value;att()" style="width:auto"><label style="margin:0">Free leaves per month</label><input type="number" style="width:70px" value="${N(doc.paidLeaves)}" onchange="atPaid('${jsq(m)}',this.value)"><span class="muted">Click a cell to change it · Off = day off (no deduction)</span></div>
-  <div class="grid"><div class="card stat"><div class="l">Total salary</div><div class="n">${lakh(sum(E,e=>N(e.salary)))}</div></div><div class="card stat"><div class="l">Saturday extra</div><div class="n">${rs(sum(R,x=>x.c.extra))}</div><div class="s">${sum(R,x=>x.c.SP+x.c.SH/2)} Saturdays worked</div></div><div class="card stat"><div class="l">Deduction (leave)</div><div class="n neg">${rs(sum(R,x=>x.c.ded))}</div></div><div class="card stat"><div class="l">To pay</div><div class="n pos">${lakh(sum(R,x=>x.c.pay))}</div></div><div class="card stat"><div class="l">Attendance Due</div><div class="n ${sum(R,x=>x.c.X)?"neg":""}">${sum(R,x=>x.c.X)}</div><div class="s">days (empty cells)</div></div></div>
-  <div class="tw" style="margin-top:12px"><table><tr><th>Employee</th>${Array.from({length:dim},(_,k)=>{const wd=new Date(+m.slice(0,4),+m.slice(5,7)-1,k+1).getDay();return`<th style="padding:4px;text-align:center;${wd===6?"background:#eef3ff;color:var(--blue,#2456c7)":wd===0?"color:var(--red)":""}">${k+1}${wd===6?"<div style='font-size:9px'>Sat</div>":""}</th>`}).join("")}<th>P</th><th>½</th><th>L</th><th>Off</th><th>Sat worked</th><th>Salary</th><th>Deduction</th><th>Sat extra</th><th>To pay</th></tr>
-  ${R.map(({e,c})=>`<tr><td style="white-space:nowrap"><b>${esc(e.name)}</b></td>${Array.from({length:dim},(_,k)=>{const v=atGet(m,e.id,k+1),st=atSat(m,k+1);return`<td style="padding:2px;text-align:center;${st?"background:#eef3ff":""}"><span class="pill ${st&&!v?"p-n":atCls(v)}" style="cursor:pointer;min-width:22px;${st&&v&&v[0]==="P"?"outline:2px solid var(--green)":""}" title="${st?"Saturday – off day. Present = extra pay":""}" onclick="atCycle('${jsq(e.id)}',${k+1})">${st&&(!v||v==="O")?"Off":atLbl(v)}</span></td>`}).join("")}
-   <td class="num">${c.P}</td><td class="num">${c.H}</td><td class="num">${c.L}</td><td class="num">${c.O+c.SO}</td><td class="num">${c.SP+c.SH/2||""}</td><td class="num">${e.salary?rs(e.salary):`<span class="neg">?</span>`}</td><td class="num neg">${c.ded?rs(c.ded):""}</td><td class="num pos">${c.extra?"+"+rs(c.extra):""}</td><td class="num"><b>${rs(c.pay)}</b>${c.X?`<div class="muted" style="font-size:11px">${c.X} days pending</div>`:""}</td></tr>`).join("")}</table></div>
+  <div class="grid"><div class="card stat"><div class="l">Total salary</div><div class="n">${lakh(sum(E,e=>N(e.salary)))}</div></div><div class="card stat"><div class="l">Saturday extra</div><div class="n">${rs(sum(R,x=>x.c.extra))}</div><div class="s">${sum(R,x=>x.c.SP+x.c.SH/2)} Saturdays worked</div></div><div class="card stat"><div class="l">Deduction (leave)</div><div class="n neg">${rs(sum(R,x=>x.c.ded))}</div></div><div class="card stat"><div class="l">To pay</div><div class="n pos">${lakh(sum(R,x=>x.c.pay))}</div></div><div class="card stat click" onclick="atView='inc';incM='${m}';att()"><div class="l">Incentive</div><div class="n pos">${rs(sum(R,x=>x.inc))}</div><div class="s">total with salary ${lakh(sum(R,x=>x.c.pay+x.inc))}</div></div><div class="card stat"><div class="l">Attendance Due</div><div class="n ${sum(R,x=>x.c.X)?"neg":""}">${sum(R,x=>x.c.X)}</div><div class="s">days (empty cells)</div></div></div>
+  <div class="tw" style="margin-top:12px"><table><tr><th>Employee</th>${Array.from({length:dim},(_,k)=>{const wd=new Date(+m.slice(0,4),+m.slice(5,7)-1,k+1).getDay();return`<th style="padding:4px;text-align:center;${wd===6?"background:#eef3ff;color:var(--blue,#2456c7)":wd===0?"color:var(--red)":""}">${k+1}${wd===6?"<div style='font-size:9px'>Sat</div>":""}</th>`}).join("")}<th>P</th><th>½</th><th>L</th><th>Off</th><th>Sat worked</th><th>Salary</th><th>Deduction</th><th>Sat extra</th><th>To pay</th><th>Incentive</th><th>Total</th></tr>
+  ${R.map(({e,c,inc})=>`<tr><td style="white-space:nowrap"><b>${esc(e.name)}</b></td>${Array.from({length:dim},(_,k)=>{const v=atGet(m,e.id,k+1),st=atSat(m,k+1);return`<td style="padding:2px;text-align:center;${st?"background:#eef3ff":""}"><span class="pill ${st&&!v?"p-n":atCls(v)}" style="cursor:pointer;min-width:22px;${st&&v&&v[0]==="P"?"outline:2px solid var(--green)":""}" title="${st?"Saturday – off day. Present = extra pay":""}" onclick="atCycle('${jsq(e.id)}',${k+1})">${st&&(!v||v==="O")?"Off":atLbl(v)}</span></td>`}).join("")}
+   <td class="num">${c.P}</td><td class="num">${c.H}</td><td class="num">${c.L}</td><td class="num">${c.O+c.SO}</td><td class="num">${c.SP+c.SH/2||""}</td><td class="num">${e.salary?rs(e.salary):`<span class="neg">?</span>`}</td><td class="num neg">${c.ded?rs(c.ded):""}</td><td class="num pos">${c.extra?"+"+rs(c.extra):""}</td><td class="num"><b>${rs(c.pay)}</b>${c.X?`<div class="muted" style="font-size:11px">${c.X} days pending</div>`:""}</td><td class="num pos">${inc?`<a href="#" onclick="atView='inc';incM='${m}';att();return false">+${rs(inc)}</a>`:""}</td><td class="num"><b>${rs(c.pay+inc)}</b></td></tr>`).join("")}</table></div>
   <p class="muted">Calculation: one day = Salary ÷ ${dim} (days in month) · Leave = 1 day, Half day = ½ day · free leaves are subtracted, the remaining days are deducted · Off days are not deducted · <b>Saturday is the weekly off</b>: a blank Saturday is not "due" and not deducted; an employee <b>present on a Saturday gets extra</b> = one day's salary (or the amount set in Employees), half day = half of it.</p>`}
 
 /* ---------- import ---------- */
@@ -1334,6 +1390,54 @@ async function importFiles(files){
   $("log").innerHTML=`<div class="tw"><table><tr><th>File</th><th>Detected as</th><th>Result</th></tr>${res.join("")}</table></div><p><button class="btn" onclick="go('dash')">Open dashboard →</button></p>`;
 }
 
+
+/* ================= Mechanic incentive on parts sold (workshop sheet counter rows + DMS service part lines) ================= */
+const INC_DEF=[{id:"chain",name:"Chain set",amt:50,words:"chain set, chain sprocket, chain kit, sprocket kit"},{id:"seat",name:"Seat cover",amt:25,words:"seat cover"},{id:"eng",name:"Engine plate",amt:25,words:"engine plate, engine guard, skid plate, sump guard"},{id:"clutch",name:"Clutch plate",amt:50,words:"clutch plate"},{id:"np",name:"Number plate",amt:25,words:"number plate, no plate, np cover, n p cover, n p, hsrp"}];
+let incM="",incQ="";
+const incRates=()=>((D.inc&&D.inc.rates&&D.inc.rates.length)?D.inc.rates:INC_DEF);
+const incNorm=t=>" "+String(t||"").toLowerCase().replace(/[^a-z0-9]+/g," ").replace(/\s+/g," ").trim()+" ";
+function incItem(desc){const t=incNorm(desc),tk=new Set(t.trim().split(" "));for(const r of incRates()){for(const w of String(r.words||"").split(",").map(x=>incNorm(x).trim()).filter(Boolean)){if(t.includes(" "+w+" "))return r;const ws=w.split(" ");if(ws.length>1&&ws.every(x=>x.length>=3&&(tk.has(x)||tk.has(x+"s"))))return r}}return null}
+function incWho(desc,r){const E=D.emp||[],al=(D.inc&&D.inc.alias)||{};const raw=[];String(desc||"").replace(/\(([A-Za-z][A-Za-z .]{1,})/g,(m,n)=>raw.push(n.trim()));
+  const skip=new Set(incNorm((r&&r.words)||"").trim().split(" ").concat(["cover","set","plate","kit","new","old","pcs","pc","nos","no"]));
+  incNorm(desc).trim().split(" ").forEach(w=>{if(/^[a-z]{3,}$/.test(w)&&!skip.has(w))raw.push(w)});
+  for(const n of raw){const k=n.toLowerCase();if(al[k])return{emp:al[k],raw:n};const b=E.map(e=>[e,nameSim(n,e.name)]).sort((a,b)=>b[1]-a[1])[0];if(b&&b[1]>=.75)return{emp:b[0].id,raw:n}}
+  return{emp:"",raw:raw[0]||""}}
+function incRows(m){const out=[],ov=(D.inc&&D.inc.ov)||{};
+  Object.values(D.wsd||{}).filter(d=>String(d.date||"").slice(0,7)===m).forEach(d=>{[["c",d.counter||[]],["u",d.updates||[]],["e",d.expenses||[]]].forEach(([s,L])=>{if(s==="e")return;L.forEach((x,i)=>{const r=incItem(x.desc);if(!r)return;const w=incWho(x.desc,r);out.push({key:`ws|${d.date}|${s}${i}`,date:d.date,src:"Workshop sheet",desc:x.desc,item:r,emp:w.emp,raw:w.raw,qty:1})})});
+    (d.jobs||[]).forEach(j=>{const t=[j.work,j.note].filter(Boolean).join(" ");const r=incItem(t);if(!r)return;const w=incWho(t,r);out.push({key:`wsj|${d.date}|${j.jc}`,date:d.date,src:"Workshop sheet · JC "+j.jc,desc:t,item:r,emp:w.emp,raw:w.raw,qty:1})})});
+  V(D.sv).filter(s=>s.open&&String(s.date||"").slice(0,7)===m&&s.pl).forEach(s=>s.pl.forEach((p,i)=>{const r=incItem(p[0]);if(!r)return;const w=s.mech?incWho("("+s.mech+")",null):{emp:"",raw:""};out.push({key:`sv|${s.no}|${i}`,date:s.date,src:"DMS bill "+String(s.no).replace(/^66115/,"")+(wsJobNo(s)?" · JC "+wsJobNo(s):""),desc:p[0],item:r,emp:w.emp,raw:s.mech||"",qty:Math.max(1,Math.round(N(p[1])||1)),jc:wsJobNo(s)})}));
+  ((D.inc&&D.inc.man)||[]).filter(x=>String(x.date).slice(0,7)===m).forEach(x=>{const r=incRates().find(y=>y.id===x.item);if(r)out.push({key:"man|"+x.id,date:x.date,src:"Added by hand",desc:x.note||"",item:r,emp:x.emp,raw:"",qty:N(x.qty)||1,man:x.id})});
+  // DMS bills with no mechanic: use the mechanic chosen for the same JC on the workshop sheet, if any
+  return out.map(x=>{const o=ov[x.key]||{};const q=o.qty!=null?N(o.qty):x.qty;return{...x,emp:o.emp!=null?o.emp:x.emp,qty:q,skip:!!o.skip,amt:o.skip?0:q*N(x.item.amt)}}).sort((a,b)=>b.date.localeCompare(a.date))}
+const incTotals=m=>{const t={};incRows(m).filter(x=>!x.skip&&x.emp).forEach(x=>{t[x.emp]=(t[x.emp]||0)+x.amt});return t};
+async function incSave(){await dbCommit([["set","meta","inc",D.inc]])}
+async function incOv(key,k,v){D.inc={...(D.inc||{})};D.inc.ov={...(D.inc.ov||{})};const o={...(D.inc.ov[key]||{})};o[k]=v;D.inc.ov[key]=o;
+  if(k==="emp"&&v){const x=incRows(incM).find(r=>r.key===key);if(x&&x.raw&&!/^sv\|/.test(key)){D.inc.alias={...(D.inc.alias||{}),[x.raw.toLowerCase()]:v}}}save();await incSave();att()}
+function incHtml(){if(!incM)incM=today().slice(0,7);const R=incRows(incM),E=atEmps(),en=id=>(D.emp.find(e=>e.id===id)||{}).name||"";
+  const L=R.filter(x=>!incQ||(x.desc+" "+x.item.name+" "+en(x.emp)+" "+x.raw).toLowerCase().includes(incQ.toLowerCase()));
+  const by={};R.filter(x=>!x.skip&&x.emp).forEach(x=>{const o=by[x.emp]||(by[x.emp]={amt:0,it:{}});o.amt+=x.amt;o.it[x.item.name]=(o.it[x.item.name]||0)+x.qty});
+  const un=R.filter(x=>!x.skip&&!x.emp),hasPL=V(D.sv).some(s=>s.pl);
+  return`<div class="row" style="flex-wrap:wrap"><input type="month" value="${incM}" onchange="incM=this.value;att()" style="width:auto"><input placeholder="Search" value="${esc(incQ)}" oninput="incQ=this.value;att();refocus(this)"><button class="btn" onclick="incManForm()">+ Add by hand</button><button class="btn g" onclick="incRateForm()">⚙ Incentive rates</button></div>
+  <div class="card" style="margin-top:8px"><b>Rates:</b> ${incRates().map(r=>`${esc(r.name)} <b>${rs(r.amt)}</b>`).join(" · ")}</div>
+  <div class="grid" style="margin-top:10px"><div class="card stat"><div class="l">Total incentive</div><div class="n pos">${rs(sum(Object.values(by),o=>o.amt))}</div><div class="s">${sum(R.filter(x=>!x.skip),x=>x.qty)} items sold</div></div>${un.length?`<div class="card stat"><div class="l">Mechanic not known</div><div class="n neg">${un.length}</div><div class="s">choose the mechanic below</div></div>`:""}</div>
+  ${table(["Mechanic",...incRates().map(r=>esc(r.name)),"Incentive"],Object.entries(by).sort((a,b)=>b[1].amt-a[1].amt).map(([id,o])=>[`<b>${esc(en(id)||"?")}</b>`,...incRates().map(r=>({n:o.it[r.name]||""})),{n:`<b>${rs(o.amt)}</b>`}]))}
+  <h3>All items sold (${L.length})</h3>
+  ${table(["Date","Where","Written as","Item","Qty","Mechanic","Incentive",""],L.slice(0,500).map(x=>[fd(x.date),`<span class="muted">${esc(x.src)}</span>`,esc(x.desc),esc(x.item.name),`<input type="number" min="0" style="width:60px" value="${x.qty}" onchange="incOv('${jsq(x.key)}','qty',this.value)">`,
+   `<select style="width:auto;${!x.emp&&!x.skip?"border-color:var(--red)":""}" onchange="incOv('${jsq(x.key)}','emp',this.value)"><option value="">${x.raw?"? "+esc(x.raw):"— choose —"}</option>${E.map(e=>`<option value="${esc(e.id)}" ${e.id===x.emp?"selected":""}>${esc(e.name)}</option>`).join("")}</select>`,
+   {n:x.skip?`<span class="muted">not counted</span>`:rs(x.amt)},x.man?`<button class="btn g s" onclick="incManDel('${jsq(x.man)}')">Delete</button>`:`<button class="btn g s" onclick="incOv('${jsq(x.key)}','skip',${!x.skip})">${x.skip?"Count it":"Don't count"}</button>`]))}
+  <p class="muted">The app finds these items in the <b>Workshop sheet</b> (counter sale / update lines like "N.P COVER (VIKAS)" — the name in the line is taken as the mechanic) and in <b>DMS service bills</b> (part names on the job card${hasPL?"":"; import the Service file again once so the part names come in"}). If the mechanic is not written, choose him once; a name chosen for a written name (e.g. "VIKASH") is remembered. Change the words / rates in ⚙ Incentive rates.</p>`}
+function incRateForm(){const R=incRates();open("Incentive rates",`<p class="muted">Words: any of these written in the part name / sheet line means this item (comma separated).</p>${R.map((r,i)=>`<div class="g2" style="margin-bottom:8px"><div><label>Item</label><input id="ir_n${i}" value="${esc(r.name)}"></div><div><label>Incentive ₹ per piece</label><input id="ir_a${i}" type="number" value="${r.amt}"></div><div style="grid-column:1/-1"><label>Words</label><input id="ir_w${i}" value="${esc(r.words)}"></div></div>`).join("")}
+  <div class="g2" style="margin-bottom:8px"><div><label>New item</label><input id="ir_nN" placeholder="e.g. Helmet"></div><div><label>Incentive ₹</label><input id="ir_aN" type="number"></div><div style="grid-column:1/-1"><label>Words</label><input id="ir_wN" placeholder="helmet"></div></div>
+  <button class="btn" onclick="incRateSave(${R.length})">Save</button>`)}
+async function incRateSave(n){const R=[];for(let i=0;i<n;i++){const name=$("ir_n"+i).value.trim();if(!name)continue;R.push({id:incRates()[i].id,name,amt:N($("ir_a"+i).value),words:$("ir_w"+i).value.trim()})}
+  const nn=$("ir_nN").value.trim();if(nn)R.push({id:uid(),name:nn,amt:N($("ir_aN").value),words:$("ir_wN").value.trim()||nn.toLowerCase()});
+  D.inc={...(D.inc||{}),rates:R};save();dlg.close();await incSave();att()}
+function incManForm(){open("Add incentive by hand",`<div class="form"><div><label>Date</label><input id="im_d" type="date" value="${today()}"></div><div><label>Mechanic</label><select id="im_e">${atEmps().map(e=>`<option value="${esc(e.id)}">${esc(e.name)}</option>`).join("")}</select></div>
+  <div><label>Item</label><select id="im_i">${incRates().map(r=>`<option value="${esc(r.id)}">${esc(r.name)} (${rs(r.amt)})</option>`).join("")}</select></div><div><label>Qty</label><input id="im_q" type="number" value="1"></div><div><label>Note</label><input id="im_n" placeholder="customer / JC"></div></div>
+  <div class="row" style="margin-top:12px"><button class="btn" onclick="incManSave()">Save</button></div>`)}
+async function incManSave(){const x={id:uid(),date:$("im_d").value||today(),emp:$("im_e").value,item:$("im_i").value,qty:N($("im_q").value)||1,note:$("im_n").value.trim()};if(!x.emp)return alert("Add employees first");
+  D.inc={...(D.inc||{}),man:[...((D.inc&&D.inc.man)||[]),x]};save();dlg.close();await incSave();incM=x.date.slice(0,7);att()}
+async function incManDel(id){if(!confirm("Delete this entry?"))return;D.inc={...(D.inc||{}),man:((D.inc&&D.inc.man)||[]).filter(x=>x.id!==id)};save();await incSave();att()}
 
 /* ================= JOYRIDE account (sold from DMS service bills + workshop day book, company cost, joyride expenses) ================= */
 const JR_RE=/joy\s*-?\s*ride/i,isJrHead=h=>/^joyride/i.test(String(h||""));
@@ -1633,6 +1737,7 @@ function startOwner(){
   UNSUB.push(F.onSnapshot(C_("stkl"),snap=>{const lists={};snap.docs.forEach(d=>{const x=d.data();if(!x||!x.id||!x.j||!x.title)return;let items=[];try{items=JSON.parse(x.j)}catch(e){}lists[x.id]={...x,items}});D.stkl={lists};if(BOOTED&&tab==="stk")refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("stkc"),snap=>{D.stkc=snap.docs.map(d=>d.data());if(BOOTED&&tab==="stk")refresh()},cErr));
   UNSUB.push(F.onSnapshot(R_("meta","staff"),d=>{D.staff=d.exists()?d.data():{};if(BOOTED&&tab==="stk")refresh()},cErr));
+  UNSUB.push(F.onSnapshot(R_("meta","inc"),d=>{D.inc=d.exists()?d.data():{};if(BOOTED&&tab==="att")refresh()},cErr));
   UNSUB.push(F.onSnapshot(R_("meta","jr"),d=>{D.jr=d.exists()?d.data():{};if(BOOTED&&tab==="jr")refresh()},cErr));
   UNSUB.push(F.onSnapshot(R_("meta","phys"),d=>{D.phys=d.exists()?d.data():{};if(BOOTED&&tab==="stk")refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("emp"),snap=>{D.emp=snap.docs.map(d=>d.data());if(BOOTED)refresh()},cErr));
