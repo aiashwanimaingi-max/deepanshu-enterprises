@@ -168,7 +168,7 @@ function render(){if(tab==="dup"&&!dupScan().length)tab="dash";({dup,wcl,dash,da
 const noData=()=>!Object.keys(D.vs).length&&!Object.keys(D.sv).length&&!Object.keys(D.vp).length;
 
 function dash(){
-  if(noData()){$("app").innerHTML=`<div class="card" style="text-align:center;padding:40px"><h2 style="margin-top:0">DMS की Excel files डालें</h2><p class="muted">Vehicle Sales, Vehicle Purchase, Service, Part Purchase, Part Sales, Parts Stock, Payment — सब एक साथ चुन सकते हैं।</p><button class="btn" onclick="go('imp')">Import DMS files</button></div>`;return}
+  if(noData()){$("app").innerHTML=`<div class="card" style="text-align:center;padding:40px"><h2 style="margin-top:0">DMS की Excel files डालें</h2><p class="muted">Vehicle Sales, Vehicle Purchase, Service, Part Purchase, Part Sales, Parts Stock, Payment — सब एक साथ चुन सकते हैं।</p><button class="btn" onclick="go('imp')">Import DMS files</button> <button class="btn g" onclick="go('imp');setTimeout(cloudCheck,50)">☁ Cloud जाँच</button></div>`;return}
   const r=range(),S=sales(r),J=services(r),P=V(D.ps).filter(x=>x.open&&inR(x.date,r));
   const VP=V(D.vp).filter(p=>inR(p.date,r)),PP=V(D.pp).filter(p=>inR(p.date,r));
   const RC=V(D.rc).filter(x=>inR(x.date,r)),EX=D.exp.filter(x=>inR(x.date,r));
@@ -1401,7 +1401,7 @@ function startOwner(){
   const {F}=FB;let ready={m:0,e:0,c:0,f:0,p:0,a:0,k:0,h:0,o:0,d:0};const go1=()=>{if(ready.m&&ready.e&&ready.c&&ready.f&&ready.p&&ready.a&&ready.k&&ready.h&&ready.o&&ready.d){BOOTED=true;setSync("☁ Synced · "+ME);save();nav();render()}};
   UNSUB.push(F.onSnapshot(R_("meta","info"),async snap=>{
     const m=snap.exists()?snap.data():null;
-    if(!m){if(!ready.m){ready.m=1;go1();if(!noData()){setSync("⏳ Uploading this device's data…");try{await pushDMS(DMSK);D.exp.forEach(e=>cPut("exp",e.id,e));Object.entries(D.coll).forEach(([no,v])=>cPut("coll",no,{...v,no}));setSync("☁ Synced · "+ME)}catch(e){cErr(e)}}}return}
+    if(!m){if(!ready.m){let cloud=false;try{const res=await loadDMS(null);cloud=res.any}catch(e){}ready.m=1;go1();if(!cloud&&!noData()){setSync("⏳ Uploading this device's data…");try{await pushDMS(DMSK);D.exp.forEach(e=>cPut("exp",e.id,e));Object.entries(D.coll).forEach(([no,v])=>cPut("coll",no,{...v,no}));setSync("☁ Synced · "+ME)}catch(e){cErr(e)}}}return}
     if(m.ver===VER&&ready.m)return;
     try{await loadDMS(m)}catch(e){return cErr(e)}
     VER=m.ver;PARTS=m.parts||{};D.meta=m.meta||{};
@@ -1421,10 +1421,18 @@ function startOwner(){
   UNSUB.push(F.onSnapshot(C_("coll"),snap=>{const o={};snap.docs.forEach(d=>{const x=d.data();o[x.no]=x});D.coll=o;if(!ready.c){ready.c=1;go1()}else refresh()},cErr));
 }
 async function loadDMS(m){
-  const snap=await FB.F.getDocs(C_("dms")),parts={};
-  snap.docs.forEach(d=>{const x=d.data();if(x.ver!==m.ver&&m.vers&&x.ver!==m.vers[x.k])return;(parts[x.k]=parts[x.k]||[])[x.i]=x.j});
-  for(const k of DMSK){const n=(m.parts||{})[k]||0;if(!n){D[k]=k==="stock"?[]:{};continue}const a=parts[k]||[];if(a.length<n||a.slice(0,n).some(x=>x==null))throw new Error("Data still uploading – reload in a minute");D[k]=JSON.parse(a.slice(0,n).join(""))}
-}
+  /* reads every DMS chunk in the cloud; uses the version the index points to, and if the index is missing or broken,
+     falls back to the newest complete copy that is actually stored — then repairs the index (no data is rewritten) */
+  const snap=await FB.F.getDocs(C_("dms")),by={};let any=false;
+  snap.docs.forEach(d=>{const x=d.data();if(!x||x.k==null)return;any=true;((by[x.k]=by[x.k]||{})[x.ver]=by[x.k][x.ver]||[])[x.i]=x.j});
+  const fixP={},fixV={},cnt=o=>Array.isArray(o)?o.length:Object.keys(o||{}).length;
+  for(const k of DMSK){const n=(m&&m.parts||{})[k]||0,cands=[m&&m.vers&&m.vers[k],m&&m.ver].filter(v=>v!=null);let got=null;
+    for(const v of cands){const a=by[k]&&by[k][v];if(n&&a&&a.length>=n&&!a.slice(0,n).some(x=>x==null)){try{got=JSON.parse(a.slice(0,n).join(""))}catch(e){}if(got)break}}
+    if(!got&&by[k]){for(const v of Object.keys(by[k]).sort((a,b)=>b-a)){const a=by[k][v];let c=0;while(a[c]!=null)c++;if(!c)continue;try{const o=JSON.parse(a.slice(0,c).join(""));if(cnt(o)||!n){got=o;fixP[k]=c;fixV[k]=+v;break}}catch(e){}}}
+    if(!got&&n)throw new Error("Data still uploading – reload in a minute");D[k]=got||(k==="stock"?[]:{})}
+  if(Object.keys(fixP).length){const nm={ver:(m&&m.ver)||Date.now(),meta:(m&&m.meta)||D.meta||{},...(m||{}),parts:{...((m&&m.parts)||{}),...fixP},vers:{...((m&&m.vers)||{}),...fixV},by:ME,fixed:Date.now()};
+    try{await FB.F.setDoc(R_("meta","info"),nm);PARTS=nm.parts;console.warn("DMS index repaired",fixP)}catch(e){console.warn("index repair failed",e)}}
+  return{any,fixed:Object.keys(fixP)}}
 async function pushDMS(keys){
   const {F}=FB,ver=Date.now(),cm=await curMeta(),vers={...(cm.vers||{})},parts={...PARTS,...(cm.parts||{})},was={...parts};
   for(const k of keys){const j=JSON.stringify(D[k]),n=Math.max(1,Math.ceil(j.length/CH));
