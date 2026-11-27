@@ -64,7 +64,7 @@ dialog .bd{padding:16px;max-height:80vh;overflow:auto}
 </head>
 <body>
 <header>
-  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span style="opacity:.75">v 27 Nov 11:05 PM</span></small></div>
+  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span style="opacity:.75">v 27 Nov 11:15 PM</span></small></div>
   <div style="text-align:right"><span id="sync" style="font-size:12px;opacity:.9;margin-right:6px"></span><button class="btn g s" id="refreshBtn" title="Get the newest app and data" onclick="appRefresh()">↻ Refresh</button> <button class="btn g s hide-off" onclick="backup()">⬇ Backup</button> <button class="btn g s" onclick="$('restoreFile').click()">⬆ Restore</button><input type="file" id="restoreFile" accept=".json" hidden onchange="restore(this)"> <button class="btn g s" id="logoutBtn" style="display:none" onclick="logout()">Logout</button></div>
 </header>
 <nav id="nav"></nav>
@@ -882,6 +882,20 @@ function oldListSave(){const L=$("ol_t").value.split(/\n/).map(x=>x.trim().toUpp
 
 /* ---------- vehicles ---------- */
 let vehView="sales",vq="",vch="";
+let vmY=null;
+function vehMonthHtml(){const all=sales().filter(s=>!vch||(vch==="y"?!!chalOf(s.no):!chalOf(s.no))).filter(s=>(s.cust+s.model+s.vin+s.no).toLowerCase().includes(vq.toLowerCase()));
+  const cy=fyStart(today()),y=vmY===null?cy:vmY,ms=fyMonths(y),pm=fyMonths(y-1),G={};all.forEach(s=>{const k=String(s.date).slice(0,7);const o=G[k]||(G[k]={n:0,v:0,m:0,mn:0});o.n++;o.v+=N(s.bill);const m=margin(s);if(m!==null){o.m+=m;o.mn++}});
+  const g=k=>G[k]||{n:0,v:0,m:0,mn:0},now=today().slice(0,7),fy=a=>`${a}-${String(a+1).slice(2)}`;
+  const tot=(L,f)=>L.reduce((a,k)=>a+f(g(k)),0),upto=ms.filter(k=>k<=now),uptoP=pm.slice(0,upto.length);
+  const mx=Math.max(1,...ms.map(k=>g(k).n),...pm.map(k=>g(k).n));
+  const ch=(a,b)=>!b?(a?`<span class="pos">new</span>`:"–"):`<span class="${a>=b?"pos":"neg"}">${a>=b?"▲":"▼"} ${Math.abs(a-b)} (${Math.round((a-b)/b*100)}%)</span>`;
+  const bar=(n,c)=>`<div style="height:7px;border-radius:4px;background:${c};width:${Math.round(n/mx*100)}%;min-width:${n?2:0}px"></div>`;
+  const rows=ms.map((k,i)=>{const a=g(k),b=g(pm[i]),fut=k>now;return[`<b>${OLMON[+k.slice(5,7)-1]}</b>`,{n:fut?`<span class="muted">–</span>`:`<b>${a.n}</b>`},{n:`<span class="muted">${b.n}</span>`},fut?"":ch(a.n,b.n),`<div style="min-width:120px">${fut?"":bar(a.n,"var(--red)")}<div style="height:2px"></div>${bar(b.n,"#bbb")}</div>`,{n:fut?"":lakh(a.v)},{n:`<span class="muted">${b.v?lakh(b.v):"–"}</span>`},{n:fut||!a.mn?"":rs(a.m/a.mn)}]});
+  rows.push([`<b>Total</b>${y===cy?`<div class="muted" style="font-size:11px">Apr – ${OLMON[+now.slice(5,7)-1]} vs same months</div>`:""}`,{n:`<b>${tot(upto,o=>o.n)}</b>`},{n:`<b>${tot(y===cy?uptoP:pm,o=>o.n)}</b>`},ch(tot(upto,o=>o.n),tot(y===cy?uptoP:pm,o=>o.n)),"",{n:`<b>${lakh(tot(upto,o=>o.v))}</b>`},{n:lakh(tot(y===cy?uptoP:pm,o=>o.v))},{n:(()=>{const m=tot(upto,o=>o.m),n=tot(upto,o=>o.mn);return n?rs(m/n):""})()}]);
+  const yrs=[...new Set(all.map(s=>fyStart(s.date)))].sort();
+  return`<div class="card" style="margin:12px 0"><div class="row" style="margin:0;flex-wrap:wrap"><h3 style="margin:0">Month-wise vehicles sold · FY ${fy(y)} vs FY ${fy(y-1)}</h3><span class="seg" style="margin-left:auto">${(yrs.includes(cy)?yrs:yrs.concat(cy)).map(a=>`<button class="${a===y?"on":""}" onclick="vmY=${a};veh()">FY ${fy(a)}</button>`).join("")}</span></div>
+   <p class="muted" style="margin:4px 0 8px">Whole year, not the dates above${vq?` · only "${esc(vq)}"`:""}${vch?` · ${vch==="y"?"with challan":"without challan"}`:""}. Red bar = FY ${fy(y)}, grey = FY ${fy(y-1)}. Type a model in the search box (e.g. Splendor) to see only that model.${yrs.length&&yrs[0]>=y?` <b>No sales data for FY ${fy(y-1)} in the app</b> – import last year's Vehicle Sales file from DMS to compare.`:""}</p>
+   ${table(["Month",`FY ${fy(y)}`,`FY ${fy(y-1)}`,"Change","",`Sale value ${fy(y)}`,`Sale value ${fy(y-1)}`,"Avg margin"],rows)}</div>`}
 function veh(){
   const r=range();
   const head=`<div class="row"><span class="seg"><button class="${vehView==="sales"?"on":""}" onclick="vehView='sales';veh()">Sales</button><button class="${vehView==="stock"?"on":""}" onclick="vehView='stock';veh()">Stock</button></span>${vehView==="sales"?perSel()+`<span class="seg">${[["","All"],["y","With challan ✔"],["n","Without challan"]].map(([v,l])=>`<button class="${vch===v?"on":""}" onclick="vch='${v}';veh()">${l}</button>`).join("")}</span>`:""}<input placeholder="Search name / model / VIN / Challan" value="${esc(vq)}" oninput="vq=this.value;veh();refocus(this)"></div>`;
@@ -890,6 +904,7 @@ function veh(){
     const wm=S.filter(s=>margin(s)!==null),mg=sum(wm,margin),low=wm.filter(s=>margin(s)<1000);
     const byM=groupSum(S,s=>s.model,()=>1);
     $("app").innerHTML=head+`<div class="grid"><div class="card stat"><div class="l">Vehicles sold</div><div class="n">${S.length}</div></div><div class="card stat"><div class="l">Sale value</div><div class="n">${lakh(sum(S,s=>s.bill))}</div></div><div class="card stat"><div class="l">Margin (ex-GST)</div><div class="n pos">${lakh(mg)}</div><div class="s">avg ${rs(wm.length?mg/wm.length:0)}</div></div><div class="card stat"><div class="l">Discount given</div><div class="n neg">${lakh(sum(S,s=>s.disc))}</div></div><div class="card stat"><div class="l">Sold below ₹1,000 margin</div><div class="n ${low.length?"neg":""}">${low.length}</div></div></div>
+    ${vehMonthHtml()}
     <div class="g2" style="margin:12px 0"><div class="card"><h3>Models sold</h3>${bars(byM.slice(0,8),v=>v+" pcs")}</div><div class="card"><h3>Margin per vehicle by model</h3>${bars(groupSum(wm,s=>s.model,margin).map(([k,v])=>[k,v/wm.filter(s=>s.model===k).length]).sort((a,b)=>b[1]-a[1]).slice(0,8),rs,"var(--green)")}</div></div>
     ${table(["Date","Invoice","Challan","Customer","Model","VIN","Sale (with GST)","Discount","Purchase cost","Margin ex-GST","Finance"],S.slice(0,400).map(s=>{const p=vpOf(s.vin),m=margin(s),fl=finOf(s.no);const cx=chalOf(s.no);return[fd(s.date),esc(s.no),cx&&cx.ch?`<a href="#" title="Change challan no." onclick="chalEdit('${jsq(s.no)}');return false"><b>${esc(cx.ch)}</b> ✎</a>${cx.pend?(()=>{const p=salePend().find(x=>x.c===cx);return p?`<div class="neg">Due ${rs(p.due)}</div>`:`<div class="pos" style="font-size:11px">balance paid ✔</div>`})():""}${cx.rcpt&&cx.rcpt.length?`<div class="muted">Day Book ${rs(sum(cx.rcpt,p=>p.amt))}</div>`:""}`:`<button class="btn g s" onclick="chalEdit('${jsq(s.no)}')">+ Challan</button>`,esc(s.cust),esc(s.model),`<span class="muted">${esc(s.vin)}</span>`,{n:rs(s.bill)},{n:s.disc?rs(s.disc):""},{n:p?rs(p.cost):"–"},{n:m===null?"–":`<span class="${m<1000?"neg":"pos"}">${rs(m)}</span>`},fl?`<span class="pill ${fl.status==="done"?"p-ok":"p-w"}" style="cursor:pointer" onclick="finForm('${fl.id}')">${esc(fl.co)} ${fl.status==="done"?"✓":"pending"}</span>`:`<button class="btn g s" onclick="finForm(null,'${jsq(s.no)}')">+ Finance</button>`]}),S.length)}`;
   }else{
