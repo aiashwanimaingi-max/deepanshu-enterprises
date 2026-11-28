@@ -97,7 +97,7 @@ body{padding-bottom:64px}.fab .bd{position:absolute;top:-4px;right:-4px;backgrou
 </head>
 <body>
 <header>
-  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span id="verTag" style="opacity:.75" title="Made = when this file was made · Uploaded = when it was put on GitHub">made 28 Nov 6:00 PM</span></small></div>
+  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span id="verTag" style="opacity:.75" title="Made = when this file was made · Uploaded = when it was put on GitHub">made 28 Nov 6:10 PM</span></small></div>
   <div style="text-align:right"><span id="sync" style="font-size:12px;opacity:.9;margin-right:6px"></span><button class="btn g s" id="refreshBtn" title="Get the newest app and data" onclick="appRefresh()">↻ Refresh</button> <button class="btn g s hide-off" onclick="backup()">⬇ Backup</button> <button class="btn g s" onclick="$('restoreFile').click()">⬆ Restore</button><input type="file" id="restoreFile" accept=".json" hidden onchange="restore(this)"> <button class="btn g s" id="logoutBtn" style="display:none" onclick="logout()">Logout</button></div>
 </header>
 <nav id="nav"></nav>
@@ -110,7 +110,10 @@ const KEY="deepanshuHeroDMS_v2";
 const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},fin:[],finpay:[],snap:{},wc:{},areg:[],dupok:{},meta:{},chal:{},old:[],dbk:[],emp:[],att:{},wsd:{},stkl:null,stkc:[],staff:{},phys:{},jr:{},inc:{},udh:{},bank:{},ho:{},banks:{},holders:{},tasks:{list:[]},drep:[],notes:{list:[]},flags:{items:{}},sreg:[],cwith:{m:{}}});
 let D=EMPTY();
 try{const s=localStorage.getItem(KEY);if(s)D=Object.assign(EMPTY(),JSON.parse(s))}catch(e){}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){alert("Browser storage is full or blocked. Take a Backup file.")}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(D));return}catch(e){}
+  /* browser storage (about 5 MB in Safari) is only a copy – the real data is in the cloud. If it is full, keep a smaller copy without the biggest lists. */
+  try{const E=EMPTY(),o={...D},big=Object.keys(D).map(k=>[k,(JSON.stringify(D[k])||"").length]).sort((a,b)=>b[1]-a[1]);for(const[k]of big){o[k]=E[k]!==undefined?E[k]:null;try{localStorage.setItem(KEY,JSON.stringify(o));if(!window._lsW){window._lsW=1;console.warn("Local copy trimmed (storage full): "+k)}return}catch(e){}}}catch(e){}
+  try{localStorage.removeItem(KEY)}catch(e){}}
 const $=id=>document.getElementById(id);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const iso=d=>{if(!(d instanceof Date)||isNaN(d))return"";const z=new Date(d.getTime()-d.getTimezoneOffset()*6e4);return z.toISOString().slice(0,10)};
