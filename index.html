@@ -97,7 +97,7 @@ body{padding-bottom:64px}.fab .bd{position:absolute;top:-4px;right:-4px;backgrou
 </head>
 <body>
 <header>
-  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span id="verTag" style="opacity:.75" title="Made = when this file was made · Uploaded = when it was put on GitHub">made 28 Nov 5:50 PM</span></small></div>
+  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span id="verTag" style="opacity:.75" title="Made = when this file was made · Uploaded = when it was put on GitHub">made 28 Nov 6:00 PM</span></small></div>
   <div style="text-align:right"><span id="sync" style="font-size:12px;opacity:.9;margin-right:6px"></span><button class="btn g s" id="refreshBtn" title="Get the newest app and data" onclick="appRefresh()">↻ Refresh</button> <button class="btn g s hide-off" onclick="backup()">⬇ Backup</button> <button class="btn g s" onclick="$('restoreFile').click()">⬆ Restore</button><input type="file" id="restoreFile" accept=".json" hidden onchange="restore(this)"> <button class="btn g s" id="logoutBtn" style="display:none" onclick="logout()">Logout</button></div>
 </header>
 <nav id="nav"></nav>
@@ -2410,7 +2410,7 @@ function vlFillXls(){const all=window._vlAll||[];vlGaps(all);const H=["Date","Ch
   XLSX.writeFile(wb,`Sale ledger – fill pending ${today()}.xlsx`);
   alert("Excel downloaded.\n\nFill the money columns (Total, Online, Cash, Loan, Company, Old bike…) – for missing challans also Date and Name. Do not change the sheet name.\n\nThen press 📥 Our register (Excel) and choose this file.")}
 function VLR(){}
-const VLADD=()=>`<span class="vl-add"><button class="btn s" onclick="vlNew()">＋ Add sale</button><label class="btn g s" style="margin:0;cursor:pointer" title="Evening list of the sales staff – sales, finance, old bike, number plate, insurance, stamp, bank deposit, cash to Deepanshu">📷 Add from photo<input type="file" accept="image/*" multiple hidden onchange="const f=[...this.files];this.value='';go('dbk');dbPhoto(f)"></label></span>`;
+const VLADD=()=>`<span class="vl-add"><button class="btn s" onclick="vlNew()">＋ Add sale</button><label class="btn g s" style="margin:0;cursor:pointer" title="Evening list of the sales staff – sales, finance, old bike, number plate, insurance, stamp, bank deposit, cash to Deepanshu">📷 Add from photo<input type="file" accept="image/*" multiple hidden onchange="const f=[...this.files];this.value='';go('dbk');dbPhoto(f)"></label><label class="btn g s" style="margin:0;cursor:pointer" title="Upload an Excel with the money of the vehicles (challan, date, name, total, online, cash, loan, company, old bike…)">📥 Add from Excel<input type="file" accept=".xlsx,.xls,.csv" hidden onchange="regImport(this)"></label><button class="btn g s" onclick="vlFillXls()" title="Download an Excel of the pending challans to fill">⬇ Blank Excel</button></span>`;
 function vlLastOf(model,no){const L=sales(["0000","9999"]).filter(s=>s.model===model&&s.no!==no&&D.chal[s.no]&&(D.chal[s.no].ins!==undefined||D.chal[s.no].rc!==undefined)).sort((a,b)=>b.date.localeCompare(a.date));return L[0]?D.chal[L[0].no]:null}
 function vlForm(no){const s=V(D.vs).find(x=>x.no===no);if(!s)return;const x=vlRow(s,vlDueMap()),c=x.c,last=vlLastOf(s.model,no),v=k=>c[k]===undefined?"":c[k];
   open(`📒 ${c.ch?"Challan "+esc(c.ch)+" · ":""}${esc(s.cust)}`,`<p class="muted" style="margin-top:0">${esc(s.model)} · ${fd(s.date)} · Invoice ${esc(String(s.no).replace(/^66115/,""))} · VIN ${esc(s.vin)}</p>
