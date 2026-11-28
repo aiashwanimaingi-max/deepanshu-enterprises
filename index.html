@@ -64,7 +64,7 @@ dialog .bd{padding:16px;max-height:80vh;overflow:auto}
 </head>
 <body>
 <header>
-  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span style="opacity:.75">v 27 Nov 11:15 PM</span></small></div>
+  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span style="opacity:.75">v 27 Nov 11:45 PM</span></small></div>
   <div style="text-align:right"><span id="sync" style="font-size:12px;opacity:.9;margin-right:6px"></span><button class="btn g s" id="refreshBtn" title="Get the newest app and data" onclick="appRefresh()">↻ Refresh</button> <button class="btn g s hide-off" onclick="backup()">⬇ Backup</button> <button class="btn g s" onclick="$('restoreFile').click()">⬆ Restore</button><input type="file" id="restoreFile" accept=".json" hidden onchange="restore(this)"> <button class="btn g s" id="logoutBtn" style="display:none" onclick="logout()">Logout</button></div>
 </header>
 <nav id="nav"></nav>
@@ -74,7 +74,7 @@ dialog .bd{padding:16px;max-height:80vh;overflow:auto}
 <script>
 /* ================= data ================= */
 const KEY="deepanshuHeroDMS_v2";
-const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},fin:[],finpay:[],snap:{},wc:{},areg:[],dupok:{},meta:{},chal:{},old:[],dbk:[],emp:[],att:{},wsd:{},stkl:null,stkc:[],staff:{},phys:{},jr:{},inc:{},udh:{},bank:{},ho:{},banks:{},holders:{}});
+const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},fin:[],finpay:[],snap:{},wc:{},areg:[],dupok:{},meta:{},chal:{},old:[],dbk:[],emp:[],att:{},wsd:{},stkl:null,stkc:[],staff:{},phys:{},jr:{},inc:{},udh:{},bank:{},ho:{},banks:{},holders:{},tasks:{list:[]}});
 let D=EMPTY();
 try{const s=localStorage.getItem(KEY);if(s)D=Object.assign(EMPTY(),JSON.parse(s))}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){alert("Browser storage is full or blocked. Take a Backup file.")}}
@@ -174,16 +174,95 @@ function groupSum(a,kf,vf){const o={};a.forEach(x=>{const k=kf(x)||"Other";o[k]=
 
 /* ================= views ================= */
 const TABS={dash:"Dashboard",daily:"💰 Daily",fin:"Finance",veh:"Vehicles",svc:"Service",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",stk:"📦 Stock",money:"Money & Expenses",dbk:"📷 Day Book",ws:"🔧 Workshop",jr:"🎟 Joyride",att:"🕘 Attendance",oldb:"Old bikes",imp:"Import DMS files"};
-let tab=(()=>{try{const t=sessionStorage.getItem("de_rt");sessionStorage.removeItem("de_rt");return t||"dash"}catch(e){return"dash"}})();
-const NAVG=[["home","🏠","Today",["dash","cash","daily","rep"]],["sale","🏍","Sales",["veh","dbk","ho","fin","oldb"]],["work","🔧","Workshop",["ws","svc","jr","acc","wcl"]],["money","💰","Money",["money","col"]],["parts","📦","Parts & Stock",["stk","parts"]],["staff","👥","Staff",["att"]],["data","⬆","Import & check",["imp","dup"]]];
-const NAVL={cash:"💵 Who has the cash",ho:"💵 Cash handover",rep:"📊 Reports (mismatch)",dash:"Dashboard",daily:"💰 Daily money",fin:"Finance",veh:"Vehicles",svc:"Service bills",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",stk:"Stock",money:"Money & Expenses",dbk:"📷 Day Book",ws:"Workshop sheets",jr:"🎟 Joyride",att:"Attendance",oldb:"Old bikes",imp:"Import DMS files",dup:"⚠ Duplicates"};
+let tab=(()=>{try{const t=sessionStorage.getItem("de_rt");sessionStorage.removeItem("de_rt");return t||"ctl"}catch(e){return"ctl"}})();
+const NAVG=[["home","🏠","Today",["ctl","dash","cash","daily","rep"]],["sale","🏍","Sales",["veh","dbk","ho","fin","oldb"]],["work","🔧","Workshop",["ws","svc","jr","acc","wcl"]],["money","💰","Money",["money","col"]],["parts","📦","Parts & Stock",["stk","parts"]],["staff","👥","Staff",["att"]],["data","⬆","Import & check",["imp","dup"]]];
+const NAVL={ctl:"🧭 Control room",cash:"💵 Who has the cash",ho:"💵 Cash handover",rep:"📊 Reports (mismatch)",dash:"Dashboard",daily:"💰 Daily money",fin:"Finance",veh:"Vehicles",svc:"Service bills",acc:"Accidental / Insurance",wcl:"Warranty claims",col:"To collect",parts:"Parts",stk:"Stock",money:"Money & Expenses",dbk:"📷 Day Book",ws:"Workshop sheets",jr:"🎟 Joyride",att:"Attendance",oldb:"Old bikes",imp:"Import DMS files",dup:"⚠ Duplicates"};
 function nav(){const dn=dupScan().length,cn=pending().length+udPendN(),tb=(D.dbk||[]).filter(x=>x.tbc).length,te=(D.exp||[]).filter(x=>x.tbc).length,badge=k=>k==="dbk"&&tb?` <span class="pill p-w" title="yet to be confirmed">⏳${tb}</span>`:k==="money"&&te?` <span class="pill p-w" title="yet to be confirmed">⏳${te}</span>`:k==="dup"&&dn?` <span class="pill p-r">${dn}</span>`:k==="col"&&cn?` <span class="pill p-r">${cn}</span>`:"";
   const G=NAVG.map(g=>[g[0],g[1],g[2],g[3].filter(k=>k!=="dup"||dn)]),cur=G.find(g=>g[3].includes(tab))||G[0];
   $("nav").innerHTML=`<div class="g1">${G.map(([id,ic,l,L])=>`<button class="${id===cur[0]?"on":""}" onclick="go('${L.includes(tab)?tab:L[0]}')"><span class="ic">${ic}</span><span>${l}${L.map(badge).join("")}</span></button>`).join("")}</div>${cur[3].length>1?`<div class="g2">${cur[3].map(k=>`<button class="${k===tab?"on":""}" onclick="go('${k}')">${NAVL[k]||TABS[k]||k}${badge(k)}</button>`).join("")}</div>`:""}`}
 let _jump=false;function go(t){tab=t;nav();_jump=true;try{render()}finally{_jump=false}scrollTo(0,0)}
 function render(){try{render0()}catch(e){console.error(e);const a=$("app");if(a)a.innerHTML=`<div class="card" style="margin-top:12px;border-color:var(--red)"><h3 style="margin-top:0">⚠ This page could not be shown</h3><p>Please send a screenshot of this box.</p><pre style="white-space:pre-wrap;font-size:12px;background:#fafafa;padding:8px;border-radius:6px">${esc(tab+": "+(e&&e.message)+"\n"+String(e&&e.stack||"").split("\n").slice(0,4).join("\n"))}</pre><button class="btn" onclick="go('dash')">Go to Dashboard</button></div>`}}
-function render0(){if(tab==="dup"&&!dupScan().length)tab="dash";const M={cash:()=>{$("app").innerHTML=cashNow()},ho:()=>{$("app").innerHTML=hoHtml()},rep,dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,stk,money,dbk,ws:wsk,jr:jry,att,oldb,imp};if(!M[tab])tab="dash";M[tab]()}
+function render0(){if(tab==="dup"&&!dupScan().length)tab="dash";const M={ctl,cash:()=>{$("app").innerHTML=cashNow()},ho:()=>{$("app").innerHTML=hoHtml()},rep,dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,stk,money,dbk,ws:wsk,jr:jry,att,oldb,imp};if(!M[tab])tab="ctl";M[tab]()}
 const noData=()=>!Object.keys(D.vs).length&&!Object.keys(D.sv).length&&!Object.keys(D.vp).length;
+
+
+/* ================= 🧭 CONTROL ROOM – the owner's one screen to run the shop from home ================= */
+let ctlD="",ctlTF=false,ctlFail=[];
+const ctlDays=d=>d?Math.round((new Date(today())-new Date(String(d).slice(0,10)))/864e5):null;
+const maxD=a=>a.filter(Boolean).map(x=>String(x).slice(0,10)).sort().pop()||"";
+function waLink(txt,ph){return`https://wa.me/${ph?"91"+ph:""}?text=${encodeURIComponent(txt)}`}
+function waBtn(txt,ph,l){return`<a class="btn g s" style="text-decoration:none" target="_blank" rel="noopener" href="${esc(waLink(txt,ph))}">📲 ${l||"WhatsApp"}</a>`}
+function ctlFresh(){const B=(D.bank&&D.bank.stmt)||[],attLast=(()=>{let best="";Object.entries(D.att||{}).forEach(([m,doc])=>Object.values((doc&&doc.d)||{}).forEach(o=>Object.entries(o||{}).forEach(([d,v])=>{if(v){const k=m+"-"+String(d).padStart(2,"0");if(k>best)best=k}})));return best})();
+  const wsLast=maxD(Object.values(D.wsd||{}).filter(d=>(d.jobs||[]).length||(d.counter||[]).length).map(d=>d.date)),M=D.meta||{};
+  const L=[
+   ["🔧","Workshop sheet (photo/Excel)",wsLast,1,"ws","Please upload today's workshop sheet in the app."],
+   ["📷","Day Book page (sales)",maxD((D.dbk||[]).map(x=>x.date)),1,"dbk","Please upload today's Day Book page photo in the app."],
+   ["🕘","Attendance",attLast,1,"att","Please mark today's attendance in the app."],
+   ["🏍","DMS vehicle sales file",M.vs&&M.vs.at,2,"imp","Please export today's Vehicle Sales file from DMS and upload it in the app."],
+   ["🧾","DMS service bills file",M.sv&&M.sv.at,2,"imp","Please export today's Service bills file from DMS and upload it in the app."],
+   ["📦","DMS parts stock file",M.stock&&M.stock.at,7,"imp","Please export the Parts Stock Report from DMS and upload it in the app."],
+   ["🏦","Bank statement",maxD(B.map(b=>b.date)),4,"daily","Please download the bank statement (Excel) from net banking and send it to me."],
+   ["💵","Cash handover / bank deposit",maxD(Object.values(D.ho||{}).filter(h=>(h.items||[]).length).map(h=>h.date)),2,"ho","Please enter today's cash deposit / handover in the app."],
+   ["💰","Expenses",maxD((D.exp||[]).map(x=>x.date)),3,"money","Please enter today's expenses in the app."]];
+  return L.map(([ic,l,d,lim,t,msg])=>{const a=ctlDays(d);return{ic,l,d,a,lim,t,msg,st:a===null?"bad":a<=lim?"ok":a<=lim*2+1?"warn":"bad"}})}
+function ctlAttn(){const out=[],T=today(),r=[T.slice(0,8)+"01",T],add=(lvl,txt,n,amt,act)=>{if(n)out.push({lvl,txt,n,amt,act})};let cur="";const tryA=f=>{try{f()}catch(e){console.warn("ctl check failed:",String(f).slice(6,60),e);ctlFail.push(String(f).match(/"([^"]{6,60})"/)?.[1]||"a check")}};ctlFail=[];
+  tryA(()=>{const W=repWs(r),sh=W.days.filter(d=>d.df<=-1);add(2,"Workshop days short this month",sh.length,sum(sh,d=>-d.df),"go('rep');setTimeout(()=>repGo('ws'),60)");add(1,"Job cards not matching DMS bill (this month)",W.jobs.length,null,"go('rep');setTimeout(()=>repGo('job'),60)");const ns=W.days.filter(d=>!d.sheet);add(2,"Days with DMS bills but no workshop sheet (this month)",ns.length,sum(ns,d=>d.dms),"go('rep');setTimeout(()=>repGo('ns'),60)")});
+  tryA(()=>{const SL=repSales(r);add(2,"Vehicle sales: money ≠ DMS bill (this month)",SL.length,sum(SL,x=>Math.abs(x.df)),"go('rep');setTimeout(()=>repGo('sale'),60)")});
+  tryA(()=>{const SP=salePend();add(1,"Sale balances still to come",SP.length,sum(SP,x=>x.due),"go('rep');setTimeout(()=>repGo('pend'),60)")});
+  tryA(()=>{const UD=udList().filter(x=>x.bal>0.5);add(1,"Workshop credit due (customers owe)",UD.length,sum(UD,x=>x.bal),"go('rep');setTimeout(()=>repGo('cd'),60)")});
+  tryA(()=>{const P=pending();add(1,"DMS credit service bills not collected",P.length,sum(P,b=>b.total),"go('col')")});
+  tryA(()=>{const n=(D.dbk||[]).filter(x=>x.tbc).length+(D.exp||[]).filter(x=>x.tbc).length;add(1,"Entries marked ‘yet to be confirmed’",n,null,"go('rep');setTimeout(()=>repGo('tbc'),60)")});
+  tryA(()=>{const st=stockVehicles().filter(x=>!x.old&&x.age>60);add(1,"New vehicles in stock for more than 60 days",st.length,sum(st,x=>x.cost),"go('veh');vehView='stock';veh()")});
+  tryA(()=>{const P=stkItems().filter(x=>stkPhys(x.part)&&stkPd(x)&&N(stkPhys(x.part)[0])<x.qty);add(2,"Parts short on the shelf (physical < DMS)",P.length,sum(P,x=>(x.qty-N(stkPhys(x.part)[0]))*x.price),"go('stk')")});
+  tryA(()=>{const H=hoRows(r,"sales").filter(x=>x.bk.some(b=>!b.m));add(2,"Cash deposits (this month) not seen in bank",H.length,null,"go('rep');setTimeout(()=>repGo('ho'),60)")});
+  tryA(()=>{const n=dupScan().length;add(1,"Possible duplicate entries",n,null,"go('dup')")});
+  tryA(()=>{const od=((D.tasks&&D.tasks.list)||[]).filter(t=>!t.done&&t.due&&t.due<T);add(2,"Staff tasks overdue",od.length,null,"ctlTF=false;document.getElementById('ctl_tasks').scrollIntoView()")});
+  return out.sort((a,b)=>b.lvl-a.lvl||(b.amt||0)-(a.amt||0))}
+function ctlAtt(dt){const m=dt.slice(0,7),d=+dt.slice(8,10),E=atEmps(),o={P:[],H:[],L:[],O:[],X:[],late:[]};E.forEach(e=>{const v=atGet(m,e.id,d);if(!v){(atOff(m,d,e)?o.O:o.X).push(e.name);return}const k=v[0]==="P"?"P":v;(o[k]||o.X).push(e.name);const lt=atLate(v,e);if(lt)o.late.push(e.name+" ("+lt+" min)")});o.n=E.length;o.marked=E.length-o.X.length;return o}
+function ctlSummary(dt,o,a,F,At){const L=[`*Deepanshu Enterprises – ${fd(dt)}*`,`🏍 Vehicles sold: ${o.vs.n} (${lakh(o.vs.amt)})`,`🔧 Workshop DMS bills: ${o.sv.n} · ${rs(o.sv.amt)}`,`📦 Counter parts: ${rs(o.ps.amt)}`,`💵 Cash in: ${rs(o.cashIn)} · Online: ${rs(o.onlineIn)}`,`👥 Staff present: ${At.P.length+At.H.length}/${At.n}${At.L.length?" · Leave: "+At.L.join(", "):""}${At.X.length&&At.marked?" · Not marked: "+At.X.length:""}`];
+  const H=HOLD();L.push(`💰 Cash now – ${H.sales}: ${rs(holdNow("sales"))} · ${H.ws}: ${rs(holdNow("ws"))}`);
+  const bad=F.filter(f=>f.st==="bad");if(bad.length)L.push("⚠ Not updated: "+bad.map(f=>f.l).join(", "));
+  if(a.length){L.push("","*Needs attention:*");a.slice(0,8).forEach(x=>L.push(`• ${x.txt}: ${x.n}${x.amt?" · "+rs(x.amt):""}`))}
+  return L.join("\n")}
+function ctl(){const T=today();if(!ctlD)ctlD=T;const dt=ctlD,yd=(()=>{const x=new Date(dt);x.setDate(x.getDate()-1);return iso(x)})();
+  let o=null,F=[],A=[],At=null,errs=[];try{o=dmDay([dt,dt])}catch(e){errs.push("day")}try{F=ctlFresh()}catch(e){errs.push("fresh")}try{A=ctlAttn()}catch(e){errs.push("attn")}try{At=ctlAtt(dt)}catch(e){At={P:[],H:[],L:[],O:[],X:[],late:[],n:0,marked:0}}
+  let wsDay=null;try{wsDay=repWs([dt,dt]).days[0]||null}catch(e){}
+  const H=HOLD(),cS=holdNow("sales"),cW=holdNow("ws"),big=50000,tk=(D.tasks&&D.tasks.list)||[],open_=tk.filter(t=>!t.done).sort((a,b)=>(a.due||"9").localeCompare(b.due||"9")),done=tk.filter(t=>t.done).sort((a,b)=>(b.doneAt||"").localeCompare(a.doneAt||"")).slice(0,10);
+  const rev=D.tasks&&D.tasks.rev,E=atEmps(),fc={ok:"p-ok",warn:"p-w",bad:"p-r"},stat=(l,n,s,cls,act)=>`<div class="card stat${act?" click":""}" ${act?`onclick="${act}"`:""}><div class="l">${l}</div><div class="n ${cls||""}">${n}</div><div class="s">${s||""}</div></div>`;
+  const nF=F.filter(f=>f.st!=="ok").length;
+  $("app").innerHTML=`<div class="row" style="flex-wrap:wrap;align-items:center"><h2 style="margin:0">🧭 Control room</h2><span class="seg" style="margin-left:8px"><button class="${dt===T?"on":""}" onclick="ctlD='${T}';ctl()">Today</button><button class="${dt!==T&&dt===(()=>{const x=new Date(T);x.setDate(x.getDate()-1);return iso(x)})()?"on":""}" onclick="ctlD='${(()=>{const x=new Date(T);x.setDate(x.getDate()-1);return iso(x)})()}';ctl()">Yesterday</button></span><input type="date" value="${dt}" max="${T}" onchange="ctlD=this.value||'${T}';ctl()" style="width:auto">
+   <span style="margin-left:auto" class="muted">${rev===T?"✔ You reviewed today":rev?"Last reviewed "+fd(rev):""}</span><button class="btn s" onclick="ctlReviewed()">✔ Reviewed</button>${o?waBtn(ctlSummary(dt,o,A,F,At),"","Send summary"):""}</div>
+  <p class="muted" style="margin:4px 0 0">Everything you need to run the showroom from home: what happened, who is updating, where the money is, and what needs you. Click any box to open the details.</p>
+  ${errs.length?`<div class="note" style="margin-top:8px">Some parts could not be worked out (${errs.join(", ")}). The rest of the page is fine.</div>`:""}
+  ${o?`<h3 style="margin-bottom:6px">📅 ${fd(dt)} at a glance</h3><div class="grid">
+   ${stat("🏍 Vehicles sold",o.vs.n,lakh(o.vs.amt),"","go('veh')")}
+   ${stat("🔧 Workshop (DMS bills)",o.sv.n,rs(o.sv.amt)+(o.sv.credit?` · credit ${rs(o.sv.credit)}`:""),"","go('svc')")}
+   ${stat("📦 Counter parts",rs(o.ps.amt),o.ps.n+" bills","","go('parts')")}
+   ${stat("💵 Cash came in",rs(o.cashIn),"Online "+rs(o.onlineIn),"pos","tab='daily';dmV='money';dmF=dmT='"+dt+"';nav();render()")}
+   ${stat("🔧 Workshop sheet vs DMS",!wsDay?"–":!wsDay.sheet?"No sheet":Math.abs(wsDay.df)<1?"✔ Matches":(wsDay.df<0?"Short ":"Extra ")+rs(Math.abs(wsDay.df)),!wsDay?"no bills":wsDay.sheet?"sheet saved":"sheet not uploaded",!wsDay||!wsDay.sheet?"":Math.abs(wsDay.df)<1?"pos":"neg","go('ws')")}
+   ${stat("💸 Expenses",rs(o.ex.out+o.ws.ex),"shop "+rs(o.ex.out)+" · workshop "+rs(o.ws.ex),"","go('money')")}</div>`:""}
+  <div class="g2" style="margin-top:12px">
+   <div class="card"><h3 style="margin-top:0">👥 Staff on ${fd(dt)}</h3>${!At.marked?`<p><span class="pill p-r">Attendance not marked yet</span></p>${waBtn("Please mark today's attendance in the app.","","Ask to mark")}`:`<div class="row" style="flex-wrap:wrap;gap:6px;margin:0"><span class="pill p-ok">Present ${At.P.length}</span>${At.H.length?`<span class="pill p-w">Half ${At.H.length}</span>`:""}<span class="pill ${At.L.length?"p-r":"p-n"}">Leave ${At.L.length}</span><span class="pill p-n">Off ${At.O.length}</span>${At.X.length?`<span class="pill p-r">Not marked ${At.X.length}</span>`:""}</div>
+     ${At.L.length?`<p style="margin:8px 0 0"><b>On leave:</b> ${esc(At.L.join(", "))}</p>`:""}${At.X.length?`<p style="margin:4px 0 0"><b>Not marked:</b> ${esc(At.X.join(", "))}</p>`:""}${At.late.length?`<p style="margin:4px 0 0"><b>Late (after 9 AM):</b> ${esc(At.late.join(", "))}</p>`:""}`}
+     <p style="margin:8px 0 0"><a href="#" onclick="go('att');return false">Open attendance →</a></p></div>
+   <div class="card"><h3 style="margin-top:0">💰 Where the cash is now</h3><div class="grid" style="grid-template-columns:1fr 1fr">${stat(esc(H.sales),rs(cS),cS>big?"⚠ big amount with staff":"",cS>big?"neg":"","go('cash')")}${stat(esc(H.ws),rs(cW),cW>big?"⚠ big amount with staff":"",cW>big?"neg":"","go('cash')")}</div>
+     ${cS>big||cW>big?`<p class="muted" style="margin:6px 0 0">More than ${rs(big)} is lying with staff. Ask them to deposit it in the bank.</p><div class="row" style="margin:6px 0 0">${waBtn(`Please deposit the cash in the bank today and enter it in the app. (${H.sales}: ${rs(cS)}, ${H.ws}: ${rs(cW)})`,"","Ask to deposit")}</div>`:""}
+     <p style="margin:8px 0 0"><a href="#" onclick="go('cash');return false">Who has the cash →</a></p></div></div>
+  <div class="card" style="margin-top:12px"><h3 style="margin-top:0">🚨 Needs your attention ${A.length?`<span class="pill p-r">${A.length}</span>`:ctlFail.length?"":`<span class="pill p-ok">✔ all clear</span>`}</h3>${ctlFail.length?`<p class="note" style="margin:0 0 8px">Could not check: ${esc(ctlFail.join(" · "))}. Open Reports (mismatch) to see these.</p>`:""}
+   ${A.length?table(["","What","How many","Amount",""],A.map(x=>[x.lvl>1?"🔴":"🟡",esc(x.txt),{n:`<b>${x.n}</b>`},{n:x.amt?rs(x.amt):""},`<button class="btn g s" onclick="${x.act}">Open →</button>`])):ctlFail.length?"":`<p class="muted">Nothing is pending. 👍</p>`}</div>
+  <div class="card" style="margin-top:12px"><h3 style="margin-top:0">📡 Is the staff updating the app? ${nF?`<span class="pill p-r">${nF} late</span>`:`<span class="pill p-ok">✔ all up to date</span>`}</h3>
+   ${table(["","What","Last updated","",""],F.map(f=>[f.ic,esc(f.l),f.d?`${fd(f.d)} <span class="muted">(${f.a===0?"today":f.a===1?"yesterday":f.a+" days ago"})</span>`:`<span class="muted">never</span>`,`<span class="pill ${fc[f.st]}">${f.st==="ok"?"✔ OK":f.st==="warn"?"Late":"Not updated"}</span>`,`${f.st!=="ok"?waBtn(f.msg,"","Remind"):""} <button class="btn g s" onclick="go('${f.t}')">Open</button>`]))}
+   <p class="muted" style="margin:6px 0 0">Green = updated in time · yellow = a little late · red = not updated. Holidays and weekly offs can show yellow – that's fine.</p></div>
+  <div class="card" id="ctl_tasks" style="margin-top:12px"><h3 style="margin-top:0">📝 Tasks for staff ${open_.length?`<span class="pill p-b">${open_.length} open</span>`:""}</h3>
+   <div class="row" style="flex-wrap:wrap;gap:6px;margin:0"><select id="tk_w" style="width:auto"><option value="">— Who —</option>${E.map(e=>`<option value="${esc(e.id)}">${esc(e.name)}${e.role?" · "+esc(e.role):""}</option>`).join("")}</select><input id="tk_t" placeholder="What should be done (e.g. call customer Ramesh for balance ₹5,000)" style="flex:1;min-width:240px"><input id="tk_d" type="date" value="${T}" style="width:auto"><button class="btn" onclick="ctlTaskAdd()">＋ Add task</button></div>
+   ${open_.length?table(["Due","Who","Task","",""],open_.map(t=>{const e=D.emp.find(x=>x.id===t.who),od=t.due&&t.due<T;return[`<span class="${od?"neg":""}">${t.due?fd(t.due):""}${od?" ⚠":""}</span>`,esc(e?e.name:t.whoName||"Anyone"),esc(t.what),`<button class="btn s" onclick="ctlTaskDone('${t.id}',true)">✔ Done</button> ${waBtn(`${e?e.name+" ji, ":""}${t.what}${t.due?" – by "+fd(t.due):""}`,e&&e.ph,"Send")}`,`<button class="btn g s" title="Delete" onclick="ctlTaskDel('${t.id}')">✕</button>`]})):`<p class="muted">No open tasks. Write what you want someone to do, pick the person and the date, then press 📲 Send to give it to them on WhatsApp. Mark ✔ Done when they finish.</p>`}
+   ${E.some(e=>e.ph)?"":`<p class="muted" style="margin:6px 0 0">Tip: add each employee's WhatsApp number (Staff → Attendance → Edit employee) so 📲 Send goes straight to that person.</p>`}
+   ${done.length?`<details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Done recently (${done.length})</summary>${table(["Done on","Who","Task",""],done.map(t=>{const e=D.emp.find(x=>x.id===t.who);return[fd(t.doneAt),esc(e?e.name:t.whoName||""),esc(t.what),`<button class="btn g s" onclick="ctlTaskDone('${t.id}',false)">Undo</button>`]}))}</details>`:""}</div>`}
+async function ctlTaskSave(list,rev){D.tasks={...(D.tasks||{}),list};if(rev)D.tasks.rev=rev;save();ctl();await dbCommit([["set","meta","tasks",D.tasks]])}
+function ctlTaskAdd(){const what=$("tk_t").value.trim();if(!what)return alert("Write the task first");const who=$("tk_w").value,e=D.emp.find(x=>x.id===who);ctlTaskSave([...((D.tasks&&D.tasks.list)||[]),{id:uid(),who,whoName:e?e.name:"",what,due:$("tk_d").value,at:today(),done:false}])}
+function ctlTaskDone(id,v){ctlTaskSave(((D.tasks&&D.tasks.list)||[]).map(t=>t.id===id?{...t,done:v,doneAt:v?today():""}:t))}
+function ctlTaskDel(id){if(!confirm("Delete this task?"))return;ctlTaskSave(((D.tasks&&D.tasks.list)||[]).filter(t=>t.id!==id))}
+function ctlReviewed(){ctlTaskSave((D.tasks&&D.tasks.list)||[],today())}
 
 function dash(){
   if(noData()){$("app").innerHTML=`<div class="card" style="text-align:center;padding:40px"><h2 style="margin-top:0">DMS Excel files</h2><p class="muted">Vehicle Sales, Vehicle Purchase, Service, Part Purchase, Part Sales, Parts Stock, Payment — choose them all together.</p><button class="btn" onclick="go('imp')">Import DMS files</button> <button class="btn g" onclick="go('imp');setTimeout(cloudCheck,50)">☁ Cloud check</button></div>`;return}
@@ -1577,12 +1656,12 @@ function atPAll(d){ATR.forEach(r=>{if(r.inc&&r.map!=="skip")r.days[d]="P"});att(
 async function atAllP(){const m=atDay.slice(0,7),d=+atDay.slice(8,10),doc=D.att[m]||(D.att[m]={m,d:{},paidLeaves:N((D.att[atPrevM(m)]||{}).paidLeaves)});doc.d=doc.d||{};let n=0;
   atEmps().forEach(e=>{doc.d[e.id]=doc.d[e.id]||{};if(!doc.d[e.id][String(d)]){doc.d[e.id][String(d)]="P";n++}});save();await dbCommit([["set","att",m,doc]]);att()}
 function atCycle(eid,day){const m=atMon,o=["P","H","L","O",""],v=atGet(m,eid,day),k=o.indexOf(v[0]==="P"?"P":v);atSet(m,eid,day,o[(k+1)%o.length]).then(att)}
-function empForm(id){const e=D.emp.find(x=>x.id===id)||{active:true};open(id?"Edit employee":"New employee",`<div class="form"><div><label>name *</label><input id="em_n" value="${esc(e.name)}"></div><div><label>Role</label><input id="em_r" value="${esc(e.role)}" placeholder="Mechanic, Washing…"></div>
+function empForm(id){const e=D.emp.find(x=>x.id===id)||{active:true};open(id?"Edit employee":"New employee",`<div class="form"><div><label>name *</label><input id="em_n" value="${esc(e.name)}"></div><div><label>Role</label><input id="em_r" value="${esc(e.role)}" placeholder="Mechanic, Washing…"></div><div><label>WhatsApp number</label><input id="em_ph" type="tel" value="${esc(e.ph||"")}" placeholder="98xxxxxxxx"></div>
   <div><label>Monthly salary ₹</label><input id="em_s" type="number" value="${e.salary||""}"></div><div><label>Type / shift</label><select id="em_sh"><option value="">Normal staff (day)</option><option value="day" ${e.shift==="day"?"selected":""}>☀️ Day guard</option><option value="night" ${e.shift==="night"?"selected":""}>🌙 Night guard</option></select></div>
   <div><label>Weekly off</label><select id="em_off"><option value="">Auto (staff: Saturday · guard: none)</option>${[["sat","Saturday"],["sun","Sunday"],["none","No weekly off (works every day)"]].map(([v,l])=>`<option value="${v}" ${e.off===v?"selected":""}>${l}</option>`).join("")}</select></div>
   <div><label>Extra for working on the weekly off ₹</label><input id="em_sat" type="number" value="${e.sat||""}" placeholder="blank = one day's salary"></div><div><label>Order</label><input id="em_o" type="number" value="${e.ord||""}"></div><div><label>Status</label><select id="em_a"><option value="1">Working</option><option value="0" ${e.active===false?"selected":""}>Left</option></select></div></div>
   <div class="row" style="margin-top:12px"><button class="btn" onclick="empSave('${jsq(id||"")}')">Save</button></div>`)}
-async function empSave(id){const v={name:$("em_n").value.trim(),role:$("em_r").value.trim(),salary:N($("em_s").value),sat:N($("em_sat").value),shift:$("em_sh").value,off:$("em_off").value,ord:N($("em_o").value),active:$("em_a").value==="1"};if(!v.name)return alert("Enter a name");
+async function empSave(id){const v={name:$("em_n").value.trim(),role:$("em_r").value.trim(),ph:($("em_ph")?$("em_ph").value.replace(/\D/g,"").slice(-10):""),salary:N($("em_s").value),sat:N($("em_sat").value),shift:$("em_sh").value,off:$("em_off").value,ord:N($("em_o").value),active:$("em_a").value==="1"};if(!v.name)return alert("Enter a name");
   if(!id&&D.emp.some(e=>nz(e.name)===nz(v.name))&&!confirm("An employee with this name already exists. Create a new one anyway?"))return;
   const x=id?Object.assign(D.emp.find(e=>e.id===id),v):{id:uid(),...v};if(!id)D.emp.push(x);save();dlg.close();await dbCommit([["set","emp",x.id,x]]);att()}
 async function atPaid(m,v){const doc=D.att[m]||(D.att[m]={m,d:{}});doc.paidLeaves=N(v);save();await dbCommit([["set","att",m,doc]]);att()}
@@ -2171,6 +2250,7 @@ function startOwner(){
   UNSUB.push(F.onSnapshot(C_("stkc"),snap=>{D.stkc=snap.docs.map(d=>d.data());if(BOOTED&&tab==="stk")refresh()},cErr));
   UNSUB.push(F.onSnapshot(R_("meta","staff"),d=>{D.staff=d.exists()?d.data():{};if(BOOTED&&tab==="stk")refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("bank"),snap=>{D.bank={...(D.bank||{}),stmt:snap.docs.flatMap(d=>d.data().stmt||[])};if(BOOTED&&tab==="daily")refresh()},cErr));
+  UNSUB.push(F.onSnapshot(R_("meta","tasks"),d=>{D.tasks=d.exists()?d.data():{list:[]};if(BOOTED&&tab==="ctl")refresh()},cErr));
   UNSUB.push(F.onSnapshot(R_("meta","holders"),d=>{D.holders=d.exists()?d.data():{};if(BOOTED&&(tab==="cash"||tab==="ho"))refresh()},cErr));
   UNSUB.push(F.onSnapshot(R_("meta","banks"),d=>{D.banks=d.exists()?d.data():{};if(BOOTED&&(tab==="daily"||tab==="ho"))refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("ho"),snap=>{D.ho={};snap.docs.forEach(d=>D.ho[d.id]=d.data());if(BOOTED&&(tab==="ho"||tab==="rep"))refresh()},cErr));
@@ -2262,11 +2342,11 @@ if(typeof window!=="undefined")(function(){const W={importFiles:"Import DMS file
   Object.entries(I).forEach(([n,where])=>{const f=window[n];if(typeof f!=="function")return;window[n]=async function(inp,...a){const fl=inp&&inp.files&&inp.files[0];if(!fl)return f.call(this,inp,...a);const L=await dupFilter([fl],where);if(!L.length){try{inp.value=""}catch(e){}return}return f.call(this,inp,...a)}})})();
 /* keep the page where it is when a screen is redrawn (no jump to top while marking attendance etc.) */
 (function(){let depth=0;const inner=()=>[...document.querySelectorAll("#app .tw, #app [data-keep]")];
-  const TABOF={cashNow:"cash",att:"att",wsk:"ws",stk:"stk",dbk:"dbk",daily:"daily",jry:"jr",money:"money",oldb:"oldb",fin:"fin",veh:"veh",svc:"svc",acc:"acc",col:"col",parts:"parts",dash:"dash",imp:"imp",wcl:"wcl",rep:"rep"};
+  const TABOF={ctl:"ctl",cashNow:"cash",att:"att",wsk:"ws",stk:"stk",dbk:"dbk",daily:"daily",jry:"jr",money:"money",oldb:"oldb",fin:"fin",veh:"veh",svc:"svc",acc:"acc",col:"col",parts:"parts",dash:"dash",imp:"imp",wcl:"wcl",rep:"rep"};
   const keep=(f,n)=>function(...a){if(depth)return f.apply(this,a);if(TABOF[n]&&typeof tab!=="undefined"&&tab!==TABOF[n]&&n!=="render")return window.render();depth++;const y=window.scrollY||0,T=inner().map(e=>[e.scrollTop,e.scrollLeft]);let r;
     try{r=f.apply(this,a)}finally{depth--}
     if(!_jump){const put=late=>{if(y&&(late?(window.scrollY||0)<1:Math.abs((window.scrollY||0)-y)>1))scrollTo(0,y);inner().forEach((e,i)=>{if(T[i]&&(!late||(e.scrollTop<1&&e.scrollLeft<1))){if(e.scrollTop!==T[i][0])e.scrollTop=T[i][0];if(e.scrollLeft!==T[i][1])e.scrollLeft=T[i][1]}})};put(false);requestAnimationFrame(()=>put(true))}return r};
-  ["render","rep","att","wsk","stk","dbk","daily","jry","money","oldb","fin","veh","svc","acc","col","parts","dash","imp","wcl"].forEach(n=>{try{if(typeof window[n]==="function")window[n]=keep(window[n],n)}catch(e){}})})();
+  ["render","ctl","rep","att","wsk","stk","dbk","daily","jry","money","oldb","fin","veh","svc","acc","col","parts","dash","imp","wcl"].forEach(n=>{try{if(typeof window[n]==="function")window[n]=keep(window[n],n)}catch(e){}})})();
 boot();
 </script>
 </body>
