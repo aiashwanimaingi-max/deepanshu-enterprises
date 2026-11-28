@@ -60,11 +60,18 @@ dialog .bd{padding:16px;max-height:80vh;overflow:auto}
 .drop{border:2px dashed #cfcfd6;border-radius:12px;padding:26px;text-align:center;background:#fff;cursor:pointer}
 .drop.over{border-color:var(--red);background:#fff5f5}
 .note{background:#fff8e6;border:1px solid #f1d9a0;border-radius:10px;padding:10px 12px;font-size:13px}
+.fab{position:fixed;right:16px;z-index:60;border:none;border-radius:50%;width:54px;height:54px;font-size:24px;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer;background:#fff}
+.fab.v{bottom:84px;background:var(--red);color:#fff}.fab.n{bottom:20px}.fab .bd{position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;border-radius:10px;font-size:11px;padding:1px 6px}
+.fab.v.rec{animation:pulse 1s infinite}@keyframes pulse{50%{box-shadow:0 0 0 12px rgba(200,30,30,.25)}}
+.fpan{position:fixed;right:16px;bottom:150px;z-index:61;width:min(420px,calc(100vw - 32px));max-height:70vh;overflow:auto;background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.3);padding:14px}
+.fpan h3{margin:0 0 8px}.fpan .x{float:right;border:none;background:none;font-size:20px;cursor:pointer}
+.nt{border-top:1px solid var(--line);padding:7px 0;display:flex;gap:8px;align-items:flex-start}.nt .t{flex:1;white-space:pre-wrap}
+@media print{.fab,.fpan{display:none!important}}
 </style>
 </head>
 <body>
 <header>
-  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span id="verTag" style="opacity:.75" title="Made = when this file was made · Uploaded = when it was put on GitHub">made 28 Nov 7:55 AM</span></small></div>
+  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span id="verTag" style="opacity:.75" title="Made = when this file was made · Uploaded = when it was put on GitHub">made 28 Nov 9:40 AM</span></small></div>
   <div style="text-align:right"><span id="sync" style="font-size:12px;opacity:.9;margin-right:6px"></span><button class="btn g s" id="refreshBtn" title="Get the newest app and data" onclick="appRefresh()">↻ Refresh</button> <button class="btn g s hide-off" onclick="backup()">⬇ Backup</button> <button class="btn g s" onclick="$('restoreFile').click()">⬆ Restore</button><input type="file" id="restoreFile" accept=".json" hidden onchange="restore(this)"> <button class="btn g s" id="logoutBtn" style="display:none" onclick="logout()">Logout</button></div>
 </header>
 <nav id="nav"></nav>
@@ -74,7 +81,7 @@ dialog .bd{padding:16px;max-height:80vh;overflow:auto}
 <script>
 /* ================= data ================= */
 const KEY="deepanshuHeroDMS_v2";
-const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},fin:[],finpay:[],snap:{},wc:{},areg:[],dupok:{},meta:{},chal:{},old:[],dbk:[],emp:[],att:{},wsd:{},stkl:null,stkc:[],staff:{},phys:{},jr:{},inc:{},udh:{},bank:{},ho:{},banks:{},holders:{},tasks:{list:[]},drep:[]});
+const EMPTY=()=>({vs:{},vp:{},sv:{},pp:{},ps:{},rc:{},stock:[],acct:{},exp:[],coll:{},fin:[],finpay:[],snap:{},wc:{},areg:[],dupok:{},meta:{},chal:{},old:[],dbk:[],emp:[],att:{},wsd:{},stkl:null,stkc:[],staff:{},phys:{},jr:{},inc:{},udh:{},bank:{},ho:{},banks:{},holders:{},tasks:{list:[]},drep:[],notes:{list:[]}});
 let D=EMPTY();
 try{const s=localStorage.getItem(KEY);if(s)D=Object.assign(EMPTY(),JSON.parse(s))}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){alert("Browser storage is full or blocked. Take a Backup file.")}}
@@ -180,7 +187,7 @@ const NAVL={lgn:"🔑 Staff logins",ctl:"🧭 Control room",cash:"💵 Who has t
 function nav(){const dn=dupScan().length,cn=pending().length+udPendN(),tb=(D.dbk||[]).filter(x=>x.tbc).length,te=(D.exp||[]).filter(x=>x.tbc).length,badge=k=>k==="dbk"&&tb?` <span class="pill p-w" title="yet to be confirmed">⏳${tb}</span>`:k==="money"&&te?` <span class="pill p-w" title="yet to be confirmed">⏳${te}</span>`:k==="dup"&&dn?` <span class="pill p-r">${dn}</span>`:k==="col"&&cn?` <span class="pill p-r">${cn}</span>`:"";
   const G=NAVG.map(g=>[g[0],g[1],g[2],g[3].filter(k=>(k!=="dup"||dn)&&!(PARTNER()&&CTRL_TABS.includes(k)))]).filter(g=>g[3].length),cur=G.find(g=>g[3].includes(tab))||G[0];
   $("nav").innerHTML=`<div class="g1">${G.map(([id,ic,l,L])=>`<button class="${id===cur[0]?"on":""}" onclick="go('${L.includes(tab)?tab:L[0]}')"><span class="ic">${ic}</span><span>${l}${L.map(badge).join("")}</span></button>`).join("")}</div>${cur[3].length>1?`<div class="g2">${cur[3].map(k=>`<button class="${k===tab?"on":""}" onclick="go('${k}')">${NAVL[k]||TABS[k]||k}${badge(k)}</button>`).join("")}</div>`:""}`}
-let _jump=false;function go(t){tab=t;nav();_jump=true;try{render()}finally{_jump=false}scrollTo(0,0)}
+let _jump=false;function go(t){tab=t;nav();fabEnsure();_jump=true;try{render()}finally{_jump=false}scrollTo(0,0)}
 function render(){try{render0()}catch(e){console.error(e);const a=$("app");if(a)a.innerHTML=`<div class="card" style="margin-top:12px;border-color:var(--red)"><h3 style="margin-top:0">⚠ This page could not be shown</h3><p>Please send a screenshot of this box.</p><pre style="white-space:pre-wrap;font-size:12px;background:#fafafa;padding:8px;border-radius:6px">${esc(tab+": "+(e&&e.message)+"\n"+String(e&&e.stack||"").split("\n").slice(0,4).join("\n"))}</pre><button class="btn" onclick="go('dash')">Go to Dashboard</button></div>`}}
 function render0(){if(tab==="dup"&&!dupScan().length)tab="dash";if(PARTNER()&&CTRL_TABS.includes(tab))tab="dash";const M={ctl,lgn,cash:()=>{$("app").innerHTML=cashNow()},ho:()=>{$("app").innerHTML=hoHtml()},rep,dup,wcl,dash,daily,fin,veh,svc,acc,col,parts,stk,money,dbk,ws:wsk,jr:jry,att,oldb,imp};if(!M[tab])tab="ctl";M[tab]()}
 const noData=()=>!Object.keys(D.vs).length&&!Object.keys(D.sv).length&&!Object.keys(D.vp).length;
@@ -216,6 +223,7 @@ function ctlAttn(){const out=[],T=today(),r=[T.slice(0,8)+"01",T],add=(lvl,txt,n
   tryA(()=>{const st=stockVehicles().filter(x=>!x.old&&x.age>60);add(1,"New vehicles in stock for more than 60 days",st.length,sum(st,x=>x.cost),"go('veh');vehView='stock';veh()")});
   tryA(()=>{const P=stkItems().filter(x=>stkPhys(x.part)&&stkPd(x)&&N(stkPhys(x.part)[0])<x.qty);add(2,"Parts short on the shelf (physical < DMS)",P.length,sum(P,x=>(x.qty-N(stkPhys(x.part)[0]))*x.price),"go('stk')")});
   tryA(()=>{const H=hoRows(r,"sales").filter(x=>x.bk.some(b=>!b.m));add(2,"Cash deposits (this month) not seen in bank",H.length,null,"go('rep');setTimeout(()=>repGo('ho'),60)")});
+  tryA(()=>{const n=ntDue();add(2,"Your notes due today (⏰)",n.length,null,"pan('n')")});
   tryA(()=>{const L=(D.drep||[]).filter(r=>!r.ok);add(2,"Staff evening reports waiting for your ✔ Accept",L.length,null,"ctlD='"+((D.drep||[]).filter(r=>!r.ok).map(r=>r.date).sort().pop()||T)+"';ctl()")});
   tryA(()=>{const n=dupScan().length;add(1,"Possible duplicate entries",n,null,"go('dup')")});
   tryA(()=>{const od=((D.tasks&&D.tasks.list)||[]).filter(t=>!t.done&&t.due&&t.due<T);add(2,"Staff tasks overdue",od.length,null,"ctlTF=false;document.getElementById('ctl_tasks').scrollIntoView()")});
@@ -2097,6 +2105,98 @@ async function stkMakeLogin(){const n=$("sk_n").value.trim(),e=$("sk_e").value.t
   stk();alert((made?`✔ Login made for ${n||e}.\nEmail: ${e}\nPassword: ${p}\n\n`:`This email already has a login (its old password stays). It is now a stock-count login.\n\n`)+"Last step: copy the Rules text on this page into Firebase → Firestore → Rules and press Publish.")}
 async function stkStaffRm(e){if(!confirm(`Remove ${e} from stock-count staff?\n(Then publish the new Rules text so the login stops working.)`))return;const S={...(D.staff||{})};S.stock=(S.stock||[]).filter(x=>x!==e);await stkStaffSave(S);stk()}
 
+
+/* ================= 📝 NOTEPAD + 🎤 VOICE COMMANDS (owner only) ================= */
+let _pan="",_rec=null,VC={heard:"",say:"",done:[],busy:false,err:""};
+const ntDoc=()=>"notes_"+sid(String(ME||"me").toLowerCase()).replace(/[^\w@.-]/g,"_");
+const ntList=()=>(D.notes&&D.notes.list)||[];
+const ntDue=()=>ntList().filter(n=>!n.done&&n.due&&n.due<=today());
+const pageName=k=>(NAVL[k]||k).replace(/^[^\wऀ-ॿ]+/,"").trim();
+function fabEnsure(){if(STAFF||!ME||!BOOTED){document.querySelectorAll(".fab,.fpan").forEach(e=>e.remove());return}
+  let n=$("fabN");if(!n){n=document.createElement("button");n.id="fabN";n.className="fab n";n.title="Notepad – write down anything to look at later";n.onclick=()=>pan("n");document.body.appendChild(n)}
+  let v=$("fabV");if(!v){v=document.createElement("button");v.id="fabV";v.className="fab v";v.title="Speak a command";v.onclick=()=>pan("v");document.body.appendChild(v)}
+  const o=ntList().filter(x=>!x.done).length,d=ntDue().length;n.innerHTML=`📝${o?`<span class="bd" style="${d?"":"background:#555"}">${o}</span>`:""}`;v.innerHTML="🎤";v.classList.toggle("rec",!!_rec)}
+function pan(k){if(_pan===k){panClose();return}_pan=k;let p=$("fpan");if(!p){p=document.createElement("div");p.id="fpan";p.className="fpan";document.body.appendChild(p)}k==="n"?notesUI():voiceUI();if(k==="v"&&!_rec&&!VC.busy)voiceStart()}
+function panClose(){_pan="";const p=$("fpan");if(p)p.remove();if(_rec)try{_rec.stop()}catch(e){}}
+/* ---- notepad ---- */
+async function ntSave(list){D.notes={...(D.notes||{}),list};save();fabEnsure();if(_pan==="n")notesUI();if(tab==="ctl")ctl();await dbCommit([["set","meta",ntDoc(),D.notes]])}
+function ntAdd(text,due,page){text=String(text||"").trim();if(!text)return null;const n={id:uid(),text,at:new Date().toISOString(),page:page||tab,due:due||"",done:false};ntSave([n,...ntList()]);return n}
+function notesUI(){const p=$("fpan");if(!p)return;const L=ntList(),open_=L.filter(n=>!n.done),dn=L.filter(n=>n.done).slice(0,15),T=today();
+  const row=n=>`<div class="nt"><input type="checkbox" style="width:auto;margin-top:3px" ${n.done?"checked":""} onchange="ntSave(ntList().map(x=>x.id==='${n.id}'?{...x,done:this.checked,doneAt:today()}:x))"><div class="t ${n.done?"muted":""}" ${n.done?'style="text-decoration:line-through"':""}>${esc(n.text)}<div class="muted" style="font-size:11px">${new Date(n.at).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}${n.page&&NAVL[n.page]?` · <a href="#" onclick="go('${n.page}');return false">${esc(pageName(n.page))}</a>`:""}${n.due?` · <span class="${!n.done&&n.due<=T?"neg":""}">⏰ ${fd(n.due)}</span>`:""}</div></div><button class="btn g s" title="Delete" onclick="if(confirm('Delete this note?'))ntSave(ntList().filter(x=>x.id!=='${n.id}'))">✕</button></div>`;
+  p.innerHTML=`<button class="x" onclick="panClose()">✕</button><h3>📝 My notes</h3>
+   <textarea id="nt_t" rows="3" placeholder="Write anything you want to look at later… (it remembers which page you were on)"></textarea>
+   <div class="row" style="margin:6px 0;flex-wrap:wrap;gap:6px"><button class="btn s" onclick="ntAdd($('nt_t').value,$('nt_d').value);$('nt_t').value=''">＋ Add note</button>${SR()?`<button class="btn g s" id="nt_mic" onclick="ntDictate()">🎤 Speak</button>`:""}<label class="muted" style="display:flex;gap:4px;align-items:center;font-size:12px">⏰ remind on <input id="nt_d" type="date" style="width:auto"></label></div>
+   ${open_.length?open_.map(row).join(""):`<p class="muted">No open notes.</p>`}
+   ${dn.length?`<details style="margin-top:6px"><summary class="muted" style="cursor:pointer">Done (${dn.length})</summary>${dn.map(row).join("")}</details>`:""}
+   <p class="muted" style="font-size:11px;margin:8px 0 0">Only you see your notes. Notes with a ⏰ date show in the 🧭 Control room on that day.</p>`;
+  setTimeout(()=>{const t=$("nt_t");if(t&&!t.value)t.focus()},50)}
+function ntDictate(){const b=$("nt_mic");listen(t=>{const e=$("nt_t");if(e)e.value=(e.value?e.value+" ":"")+t},()=>{if(b)b.textContent="🎤 Speak"});if(b)b.textContent="⏺ Listening… (tap to stop)";if(b)b.onclick=()=>{try{_rec&&_rec.stop()}catch(e){}}}
+/* ---- speech helpers ---- */
+const SR=()=>window.SpeechRecognition||window.webkitSpeechRecognition;
+const vcLang=()=>lsg("de_vlang","hi-IN"),vcMute=()=>lsg("de_vmute","")==="1";
+function listen(onText,onEnd){const C=SR();if(!C){alert("This browser cannot listen. Use Safari or Chrome. You can type the command instead.");onEnd&&onEnd();return}
+  try{if(_rec)_rec.stop()}catch(e){}const r=new C();r.lang=vcLang();r.interimResults=true;r.continuous=false;r.maxAlternatives=1;let fin="";
+  r.onresult=e=>{let t="";for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)fin+=e.results[i][0].transcript;else t+=e.results[i][0].transcript}const live=$("vc_live");if(live)live.textContent=fin+t};
+  r.onerror=e=>{VC.err=e.error==="not-allowed"||e.error==="service-not-allowed"?"Microphone permission is off. Allow the microphone for this website (Safari → Settings for this website → Microphone → Allow).":e.error==="no-speech"?"Didn't hear anything. Tap 🎤 and speak.":"Mic error: "+e.error};
+  r.onend=()=>{_rec=null;fabEnsure();if(fin.trim())onText(fin.trim());onEnd&&onEnd()};_rec=r;fabEnsure();try{r.start()}catch(e){_rec=null;fabEnsure();onEnd&&onEnd()}}
+function speak(t){if(vcMute()||!window.speechSynthesis||!t)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(String(t).replace(/[*_#]/g,""));u.lang=/[ऀ-ॿ]/.test(t)?"hi-IN":"en-IN";const v=speechSynthesis.getVoices().find(x=>x.lang===u.lang||x.lang.replace("_","-")===u.lang);if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
+/* ---- voice command panel ---- */
+function voiceUI(){const p=$("fpan");if(!p)return;const ex=PARTNER()?["वर्कशॉप शीट खोलो","कल का डेली मनी दिखाओ","Splendor का स्टॉक दिखाओ","नोट करो: Raju का बैलेंस पूछना है"]:["आज का हिसाब बताओ","कल का कंट्रोल रूम खोलो","वर्कशॉप को टास्क दो: बाइक धुलाई एरिया साफ़ करो, कल तक","नोट करो: बैंक स्टेटमेंट मंगवाना है","कैश किसके पास है?"];
+  p.innerHTML=`<button class="x" onclick="panClose()">✕</button><h3>🎤 Tell the app what to do</h3>
+   <div style="min-height:44px;padding:8px;border-radius:8px;background:#f6f6f6"><span class="muted" style="font-size:11px">${_rec?"⏺ Listening…":"You said:"}</span><div id="vc_live" style="font-size:16px">${esc(VC.heard)}</div></div>
+   ${VC.busy?`<p>⏳ Working…</p>`:""}${VC.err?`<p class="neg">${esc(VC.err)}</p>`:""}
+   ${VC.say?`<div style="margin:8px 0;padding:8px;border-radius:8px;background:#eef6ee">💬 ${esc(VC.say)}</div>`:""}
+   ${VC.done.length?`<div style="margin:6px 0">${VC.done.map(d=>`<div>✔ ${esc(d.l)} ${d.undo?`<button class="btn g s" onclick="vcUndo('${d.undo}')">Undo</button>`:""}</div>`).join("")}</div>`:""}
+   <div class="row" style="margin:8px 0;gap:6px"><button class="btn" onclick="voiceStart()">${_rec?"⏹ Stop":"🎤 Speak"}</button><input id="vc_in" placeholder="…or type it here" onkeydown="if(event.key==='Enter'){vcRun(this.value);this.value=''}" style="flex:1"></div>
+   <div class="row" style="margin:0;gap:6px;flex-wrap:wrap;font-size:12px"><span class="seg">${[["hi-IN","हिंदी"],["en-IN","English"]].map(([v,l])=>`<button class="${vcLang()===v?"on":""}" onclick="localStorage.setItem('de_vlang','${v}');voiceUI()">${l}</button>`).join("")}</span><label style="display:flex;gap:4px;align-items:center"><input type="checkbox" style="width:auto" ${vcMute()?"":"checked"} onchange="localStorage.setItem('de_vmute',this.checked?'':'1')"> speak the answer</label></div>
+   <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">What can I say?</summary><ul style="margin:6px 0;padding-left:18px">${ex.map(x=>`<li><a href="#" onclick="vcRun('${jsq(x)}');return false">${esc(x)}</a></li>`).join("")}</ul>
+   <p class="muted" style="font-size:12px">Open any page, show a date, search a vehicle or part, write a note${PARTNER()?"":", give a task to staff"}, or ask about today's numbers. ${oaKey()?"ChatGPT understands free speech.":"Add the ChatGPT key (Import page ⚙) so it understands any sentence – without it only simple commands work."} For safety, voice never adds or deletes money entries.</p></details>`;
+  const l=$("vc_live");if(l&&_rec)l.textContent=""}
+function voiceStart(){if(_rec){try{_rec.stop()}catch(e){}return}VC={heard:"",say:"",done:[],busy:false,err:""};voiceUI();listen(t=>{VC.heard=t;vcRun(t)},()=>{if(_pan==="v")voiceUI()});voiceUI()}
+function vcPages(){const L=[];NAVG.forEach(g=>g[3].forEach(k=>{if(!(PARTNER()&&CTRL_TABS.includes(k)))L.push([k,pageName(k)])}));return L}
+function vcLocal(t){const s=t.toLowerCase(),A=[],T=today(),yd=(()=>{const x=new Date(T);x.setDate(x.getDate()-1);return iso(x)})();
+  const nm=s.match(/^(?:note|नोट|याद रखो|याद|remember|लिखो|लिख लो)\s*(?:करो|कर लो|कर|that)?\s*[:,-]?\s*(.+)$/i);if(nm)return{actions:[{type:"note",text:t.replace(/^\S+\s*(करो|कर लो|कर)?\s*[:,-]?\s*/,"")}],say:"नोट कर लिया।"};
+  const P=[["ctl",/control|कंट्रोल/],["cash",/(किसके|kiske|who).*(cash|कैश)|cash.*(किसके|kiske|kahan|कहाँ)/],["rep",/report|रिपोर्ट|mismatch/],["daily",/daily|डेली|आज का पैसा|bank|बैंक/],["dbk",/day ?book|डे ?बुक/],["ho",/handover|हैंडओवर/],["fin",/financ|फाइनेंस/],["oldb",/old bike|पुरान/],["veh",/vehicle|गाड़ी|गाडी|bike sale|सेल/],["ws",/workshop sheet|वर्कशॉप शीट|वर्कशॉप/],["svc",/service|सर्विस/],["jr",/joy ?ride|जॉय/],["acc",/accident|एक्सीडेंट|insurance|इंश्योरेंस/],["wcl",/warranty|वारंटी/],["col",/collect|उधार|credit/],["stk",/stock|स्टॉक/],["parts",/part|पार्ट/],["money",/money|expense|खर्च|मनी/],["att",/attendance|हाज़िरी|हाजिरी|अटेंडेंस/],["lgn",/login|लॉगिन/],["imp",/import|इम्पोर्ट/],["dash",/dashboard|डैशबोर्ड/]];
+  const hit=P.find(([k,re])=>re.test(s)&&vcPages().some(p=>p[0]===k));if(hit)A.push({type:"go",page:hit[0]});
+  if(/yesterday|कल|kal/.test(s))A.push({type:"date",date:yd});else if(/today|आज|aaj/.test(s)&&(!hit||["ctl","daily"].includes(hit[0])))A.push({type:"date",date:T});
+  if(!A.length&&/हिसाब|summary|समरी|बताओ/.test(s))A.push({type:"summary"});
+  return A.length?{actions:A,say:""}:null}
+async function oaText(sys,user){const res=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+oaKey()},body:JSON.stringify({model:oaModel(),response_format:{type:"json_object"},messages:[{role:"system",content:sys},{role:"user",content:user}]})});
+  const j=await res.json().catch(()=>({}));if(!res.ok)throw new Error(res.status===401?"ChatGPT key is wrong":res.status===429?"OpenAI balance/limit used up":"ChatGPT error "+res.status);return JSON.parse(((j.choices||[])[0]||{}).message.content.replace(/^```(json)?|```$/g,"").trim())}
+function vcData(){const T=today(),o={};try{const d=dmDay([T,T]);o.today={date:T,vehicles_sold:d.vs.n,vehicle_sale_value:d.vs.amt,workshop_dms_bills:d.sv.n,workshop_amount:d.sv.amt,counter_parts:d.ps.amt,cash_in:d.cashIn,online_in:d.onlineIn,expenses:d.ex.out+d.ws.ex}}catch(e){}
+  try{const x=new Date(T);x.setDate(x.getDate()-1);const y=iso(x),d=dmDay([y,y]);o.yesterday={date:y,vehicles_sold:d.vs.n,workshop_dms_bills:d.sv.n,workshop_amount:d.sv.amt,cash_in:d.cashIn,online_in:d.onlineIn}}catch(e){}
+  try{const H=HOLD();o.cash_now={[H.sales]:holdNow("sales"),[H.ws]:holdNow("ws")}}catch(e){}
+  try{if(!PARTNER())o.needs_attention=ctlAttn().map(a=>a.txt+": "+a.n+(a.amt?" (₹"+Math.round(a.amt)+")":""))}catch(e){}
+  try{const At=ctlAtt(T);o.staff_today={present:At.P.length+At.H.length,leave:At.L,not_marked:At.X.length}}catch(e){}
+  try{o.month_vehicles_sold=sales().filter(s=>String(s.date).slice(0,7)===T.slice(0,7)).length}catch(e){}
+  o.open_notes=ntList().filter(n=>!n.done).map(n=>n.text).slice(0,10);return o}
+async function vcAI(t){const pages=vcPages(),emps=atEmps().map(e=>[e.id,e.name,e.role||""]),desks=PARTNER()?[]:["sales","ws"].filter(d=>lgnDesk(D.staff||{},d)).map(d=>"desk:"+d);
+  const sys=`You are the voice assistant inside the owner's Hero two-wheeler dealership app (Deepanshu Enterprises). The owner speaks Hindi, Hinglish or English. Turn what he says into JSON: {"say":"short spoken reply, same language as the owner (Hindi in Devanagari when he speaks Hindi), max 2 sentences","actions":[...]}.
+Allowed actions ONLY (never invent others):
+{"type":"go","page":<page id>} – open a page. Pages: ${JSON.stringify(pages)}
+{"type":"date","date":"YYYY-MM-DD"} – show that date in Control room / Daily money (today is ${today()})
+{"type":"search","page":"veh"|"stk"|"oldb","q":"text"} – search vehicles / parts stock / old bikes
+{"type":"note","text":"...","due":"YYYY-MM-DD or empty"} – write a note for the owner
+${PARTNER()?"":`{"type":"task","who":<one of ${JSON.stringify(desks)} or an employee id or "">,"what":"...","due":"YYYY-MM-DD or empty"} – give a task to staff. Employees: ${JSON.stringify(emps)}`}
+{"type":"summary"} – read out today's summary
+Questions about numbers: answer in "say" ONLY from DATA below, in rupees; if the answer is not in DATA, say so briefly and open the page where it can be seen. You cannot add, change or delete any money entry, sale, payment or employee – if asked, say it must be done on the page and open that page. Empty actions list is fine for a pure question.
+DATA: ${JSON.stringify(vcData())}`;
+  return oaText(sys,t)}
+async function vcRun(t){t=String(t||"").trim();if(!t)return;VC={heard:t,say:"",done:[],busy:true,err:""};if(_pan!=="v"){_pan="";pan("v");try{_rec&&_rec.stop()}catch(e){}}voiceUI();
+  let r=null;if(!oaKey())await aiCloudLoad();
+  if(oaKey()){try{r=await vcAI(t)}catch(e){VC.err=String(e.message||e)+" – trying simple mode."}}
+  if(!r)r=vcLocal(t)||{actions:[],say:oaKey()?"":"समझ नहीं आया। आसान शब्दों में बोलिए, जैसे 'वर्कशॉप शीट खोलो' या 'नोट करो …'."};
+  VC.busy=false;VC.say=r.say||"";(r.actions||[]).forEach(a=>{try{vcDo(a)}catch(e){console.warn(e)}});
+  if(!VC.say&&VC.done.length)VC.say=VC.done.map(d=>d.l).join(", ");voiceUI();speak(VC.say)}
+function vcDo(a){const pages=vcPages().map(p=>p[0]),add=(l,undo)=>VC.done.push({l,undo});
+  if(a.type==="go"&&pages.includes(a.page)){go(a.page);add("Opened "+pageName(a.page))}
+  else if(a.type==="date"&&/^\d{4}-\d\d-\d\d$/.test(a.date||"")){if(tab==="daily"){dmF=dmT=a.date;daily()}else if(pages.includes("ctl")){ctlD=a.date;go("ctl")}else{dmF=dmT=a.date;go("daily")}add("Showing "+fd(a.date))}
+  else if(a.type==="search"){const q=String(a.q||"");if(a.page==="veh"){vq=q;go("veh")}else if(a.page==="stk"){stkV="list";stkQ=q;stkLim=300;go("stk")}else if(a.page==="oldb"){oq=q;go("oldb")}else return;add(`Searched "${q}"`)}
+  else if(a.type==="note"){const n=ntAdd(a.text,/^\d{4}-\d\d-\d\d$/.test(a.due||"")?a.due:"");if(n)add("Note saved: "+n.text.slice(0,60),"n:"+n.id)}
+  else if(a.type==="task"&&!PARTNER()){const what=String(a.what||"").trim();if(!what)return;const t={id:uid(),who:String(a.who||""),whoName:taskWho({who:String(a.who||"")}).name,what,due:/^\d{4}-\d\d-\d\d$/.test(a.due||"")?a.due:"",at:today(),done:false};ctlTaskSave([...((D.tasks&&D.tasks.list)||[]),t]);add(`Task for ${t.whoName||"anyone"}: ${what.slice(0,60)}`,"t:"+t.id)}
+  else if(a.type==="summary"){try{const T=today(),o=dmDay([T,T]),At=ctlAtt(T),txt=ctlSummary(T,o,PARTNER()?[]:ctlAttn(),ctlFresh(),At).replace(/\*/g,"");if(!VC.say)VC.say=txt.split("\n").slice(1,6).join(". ");add("Today's summary")}catch(e){}}}
+function vcUndo(k){if(k.startsWith("n:"))ntSave(ntList().filter(x=>x.id!==k.slice(2)));else if(k.startsWith("t:"))ctlTaskSave(((D.tasks&&D.tasks.list)||[]).filter(x=>x.id!==k.slice(2)));VC.done=VC.done.filter(d=>d.undo!==k);voiceUI()}
+
 /* ================= 🔑 STAFF LOGINS + 📨 EVENING REPORTS ================= */
 const DRK=['id','by','name','eid','desk','date','at','cash','online','exp','dep','own','left','n','note','att','done'];
 const PARTNER_DEF=["deepanshumaingi@gmail.com"];
@@ -2401,7 +2501,7 @@ async function start(){
 function startOwner(){
   aiCloudLoad();
   screen(`<div class="empty">⏳ Loading data…</div>`);setSync("⏳");
-  const {F}=FB;let ready={m:0,e:0,c:0,f:0,p:0,a:0,k:0,h:0,o:0,d:0};const go1=()=>{if(ready.m&&ready.e&&ready.c&&ready.f&&ready.p&&ready.a&&ready.k&&ready.h&&ready.o&&ready.d){BOOTED=true;kitchenFix();setSync("☁ Synced · "+ME);save();nav();render();setTimeout(dcfgPub,1500)}};
+  const {F}=FB;let ready={m:0,e:0,c:0,f:0,p:0,a:0,k:0,h:0,o:0,d:0};const go1=()=>{if(ready.m&&ready.e&&ready.c&&ready.f&&ready.p&&ready.a&&ready.k&&ready.h&&ready.o&&ready.d){BOOTED=true;kitchenFix();setSync("☁ Synced · "+ME);save();nav();render();fabEnsure();setTimeout(dcfgPub,1500)}};
   UNSUB.push(F.onSnapshot(R_("meta","info"),async snap=>{
     const m=snap.exists()?snap.data():null;
     if(!m){if(!ready.m){let cloud=false;try{const res=await loadDMS(null);cloud=res.any}catch(e){}ready.m=1;go1();if(!cloud&&!noData()){setSync("⏳ Uploading this device's data…");try{await pushDMS(DMSK);D.exp.forEach(e=>cPut("exp",e.id,e));Object.entries(D.coll).forEach(([no,v])=>cPut("coll",no,{...v,no}));setSync("☁ Synced · "+ME)}catch(e){cErr(e)}}}return}
@@ -2417,6 +2517,7 @@ function startOwner(){
   UNSUB.push(F.onSnapshot(R_("meta","staff"),d=>{D.staff=d.exists()?d.data():{};if(BOOTED){nav();if(tab==="stk"||tab==="lgn"||(PARTNER()&&CTRL_TABS.includes(tab)))refresh()}},cErr));
   UNSUB.push(F.onSnapshot(C_("bank"),snap=>{D.bank={...(D.bank||{}),stmt:snap.docs.flatMap(d=>d.data().stmt||[])};if(BOOTED&&tab==="daily")refresh()},cErr));
   UNSUB.push(F.onSnapshot(C_("drep"),snap=>{D.drep=snap.docs.map(d=>d.data());if(BOOTED&&(tab==="ctl"||tab==="lgn"))refresh()},e=>console.warn("drep",e)));
+  UNSUB.push(F.onSnapshot(R_("meta",ntDoc()),d=>{D.notes=d.exists()?d.data():{list:[]};fabEnsure();if(BOOTED&&_pan==="n")notesUI()},e=>console.warn("notes",e)));
   UNSUB.push(F.onSnapshot(R_("meta","tasks"),d=>{D.tasks=d.exists()?d.data():{list:[]};if(BOOTED&&tab==="ctl")refresh()},cErr));
   UNSUB.push(F.onSnapshot(R_("meta","holders"),d=>{D.holders=d.exists()?d.data():{};if(BOOTED&&(tab==="cash"||tab==="ho"))refresh()},cErr));
   UNSUB.push(F.onSnapshot(R_("meta","banks"),d=>{D.banks=d.exists()?d.data():{};if(BOOTED&&(tab==="daily"||tab==="ho"))refresh()},cErr));
