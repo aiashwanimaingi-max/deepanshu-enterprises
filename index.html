@@ -64,7 +64,7 @@ dialog .bd{padding:16px;max-height:80vh;overflow:auto}
 </head>
 <body>
 <header>
-  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span id="verTag" style="opacity:.75" title="Made = when this file was made · Uploaded = when it was put on GitHub">made 28 Nov 7:47 AM</span></small></div>
+  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span id="verTag" style="opacity:.75" title="Made = when this file was made · Uploaded = when it was put on GitHub">made 28 Nov 7:55 AM</span></small></div>
   <div style="text-align:right"><span id="sync" style="font-size:12px;opacity:.9;margin-right:6px"></span><button class="btn g s" id="refreshBtn" title="Get the newest app and data" onclick="appRefresh()">↻ Refresh</button> <button class="btn g s hide-off" onclick="backup()">⬇ Backup</button> <button class="btn g s" onclick="$('restoreFile').click()">⬆ Restore</button><input type="file" id="restoreFile" accept=".json" hidden onchange="restore(this)"> <button class="btn g s" id="logoutBtn" style="display:none" onclick="logout()">Logout</button></div>
 </header>
 <nav id="nav"></nav>
@@ -2099,7 +2099,8 @@ async function stkStaffRm(e){if(!confirm(`Remove ${e} from stock-count staff?\n(
 
 /* ================= 🔑 STAFF LOGINS + 📨 EVENING REPORTS ================= */
 const DRK=['id','by','name','eid','desk','date','at','cash','online','exp','dep','own','left','n','note','att','done'];
-const PARTNERS=()=>((D.staff&&D.staff.partners)||[]).map(x=>String(x).toLowerCase());
+const PARTNER_DEF=["deepanshumaingi@gmail.com"];
+const PARTNERS=()=>((D.staff&&D.staff.partners)||PARTNER_DEF).map(x=>String(x).toLowerCase());
 const PARTNER=()=>!STAFF&&PARTNERS().includes(String(ME).toLowerCase());
 const OWN=()=>[...new Set([String(ME).toLowerCase(),...((D.staff&&D.staff.owners)||[])].filter(Boolean))].filter(e=>!PARTNERS().includes(e)).join(", ");
 const CTRL_TABS=["ctl","lgn"];
