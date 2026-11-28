@@ -71,7 +71,7 @@ dialog .bd{padding:16px;max-height:80vh;overflow:auto}
 </head>
 <body>
 <header>
-  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span id="verTag" style="opacity:.75" title="Made = when this file was made · Uploaded = when it was put on GitHub">made 28 Nov 9:47 AM</span></small></div>
+  <div><h1>Deepanshu Enterprises</h1><small>Hero Business Dashboard · DMS data · <span id="verTag" style="opacity:.75" title="Made = when this file was made · Uploaded = when it was put on GitHub">made 28 Nov 10:01 AM</span></small></div>
   <div style="text-align:right"><span id="sync" style="font-size:12px;opacity:.9;margin-right:6px"></span><button class="btn g s" id="refreshBtn" title="Get the newest app and data" onclick="appRefresh()">↻ Refresh</button> <button class="btn g s hide-off" onclick="backup()">⬇ Backup</button> <button class="btn g s" onclick="$('restoreFile').click()">⬆ Restore</button><input type="file" id="restoreFile" accept=".json" hidden onchange="restore(this)"> <button class="btn g s" id="logoutBtn" style="display:none" onclick="logout()">Logout</button></div>
 </header>
 <nav id="nav"></nav>
@@ -2114,9 +2114,9 @@ const ntDue=()=>ntList().filter(n=>!n.done&&n.due&&n.due<=today());
 const pageName=k=>(NAVL[k]||k).replace(/^[^\wऀ-ॿ]+/,"").trim();
 function fabEnsure(){if(STAFF||!ME||!BOOTED){document.querySelectorAll(".fab,.fpan").forEach(e=>e.remove());return}
   let n=$("fabN");if(!n){n=document.createElement("button");n.id="fabN";n.className="fab n";n.title="Notepad – write down anything to look at later";n.onclick=()=>pan("n");document.body.appendChild(n)}
-  let v=$("fabV");if(!v){v=document.createElement("button");v.id="fabV";v.className="fab v";v.title="Speak a command";v.onclick=()=>pan("v");document.body.appendChild(v)}
-  const o=ntList().filter(x=>!x.done).length,d=ntDue().length;n.innerHTML=`📝${o?`<span class="bd" style="${d?"":"background:#555"}">${o}</span>`:""}`;v.innerHTML="🎤";v.classList.toggle("rec",!!_rec)}
-function pan(k){if(_pan===k){panClose();return}_pan=k;let p=$("fpan");if(!p){p=document.createElement("div");p.id="fpan";p.className="fpan";document.body.appendChild(p)}k==="n"?notesUI():voiceUI();if(k==="v"&&!_rec&&!VC.busy)voiceStart()}
+  let v=$("fabV");if(PARTNER()){if(v)v.remove();if(_pan==="v")panClose();v=null}else if(!v){v=document.createElement("button");v.id="fabV";v.className="fab v";v.title="Speak a command";v.onclick=()=>pan("v");document.body.appendChild(v)}
+  const o=ntList().filter(x=>!x.done).length,d=ntDue().length;n.innerHTML=`📝${o?`<span class="bd" style="${d?"":"background:#555"}">${o}</span>`:""}`;if(v){v.innerHTML="🎤";v.classList.toggle("rec",!!_rec)}}
+function pan(k){if(k==="v"&&PARTNER())return;if(_pan===k){panClose();return}_pan=k;let p=$("fpan");if(!p){p=document.createElement("div");p.id="fpan";p.className="fpan";document.body.appendChild(p)}k==="n"?notesUI():voiceUI();if(k==="v"&&!_rec&&!VC.busy)voiceStart()}
 function panClose(){_pan="";const p=$("fpan");if(p)p.remove();if(_rec)try{_rec.stop()}catch(e){}}
 /* ---- notepad ---- */
 async function ntSave(list){D.notes={...(D.notes||{}),list};save();fabEnsure();if(_pan==="n")notesUI();if(tab==="ctl")ctl();await dbCommit([["set","meta",ntDoc(),D.notes]])}
@@ -2125,7 +2125,7 @@ function notesUI(){const p=$("fpan");if(!p)return;const L=ntList(),open_=L.filte
   const row=n=>`<div class="nt"><input type="checkbox" style="width:auto;margin-top:3px" ${n.done?"checked":""} onchange="ntSave(ntList().map(x=>x.id==='${n.id}'?{...x,done:this.checked,doneAt:today()}:x))"><div class="t ${n.done?"muted":""}" ${n.done?'style="text-decoration:line-through"':""}>${esc(n.text)}<div class="muted" style="font-size:11px">${new Date(n.at).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}${n.page&&NAVL[n.page]?` · <a href="#" onclick="go('${n.page}');return false">${esc(pageName(n.page))}</a>`:""}${n.due?` · <span class="${!n.done&&n.due<=T?"neg":""}">⏰ ${fd(n.due)}</span>`:""}</div></div><button class="btn g s" title="Delete" onclick="if(confirm('Delete this note?'))ntSave(ntList().filter(x=>x.id!=='${n.id}'))">✕</button></div>`;
   p.innerHTML=`<button class="x" onclick="panClose()">✕</button><h3>📝 My notes</h3>
    <textarea id="nt_t" rows="3" placeholder="Write anything you want to look at later… (it remembers which page you were on)"></textarea>
-   <div class="row" style="margin:6px 0;flex-wrap:wrap;gap:6px"><button class="btn s" onclick="ntAdd($('nt_t').value,$('nt_d').value);$('nt_t').value=''">＋ Add note</button>${SR()?`<button class="btn g s" id="nt_mic" onclick="ntDictate()">🎤 Speak</button>`:""}<label class="muted" style="display:flex;gap:4px;align-items:center;font-size:12px">⏰ remind on <input id="nt_d" type="date" style="width:auto"></label></div>
+   <div class="row" style="margin:6px 0;flex-wrap:wrap;gap:6px"><button class="btn s" onclick="ntAdd($('nt_t').value,$('nt_d').value);$('nt_t').value=''">＋ Add note</button>${SR()&&!PARTNER()?`<button class="btn g s" id="nt_mic" onclick="ntDictate()">🎤 Speak</button>`:""}<label class="muted" style="display:flex;gap:4px;align-items:center;font-size:12px">⏰ remind on <input id="nt_d" type="date" style="width:auto"></label></div>
    ${open_.length?open_.map(row).join(""):`<p class="muted">No open notes.</p>`}
    ${dn.length?`<details style="margin-top:6px"><summary class="muted" style="cursor:pointer">Done (${dn.length})</summary>${dn.map(row).join("")}</details>`:""}
    <p class="muted" style="font-size:11px;margin:8px 0 0">Only you see your notes. Notes with a ⏰ date show in the 🧭 Control room on that day.</p>`;
@@ -2195,7 +2195,7 @@ Questions about numbers: answer in "say" ONLY from DATA below, in rupees; if the
 DATA: ${JSON.stringify(vcData())}`;
   return oaText(sys,t)}
 const SAVE_RE=/^(save|सेव|सेफ|हाँ|हां|ha+n|ji ha+n|जी हाँ|yes|ok|okay|ओके|ठीक है|कर दो|done|डन|पक्का)(?=$|[\s,.!।])|^(सेव|save) ?(करो|कर दो|kar do|karo)/i;
-async function vcRun(t){t=String(t||"").trim();if(!t)return;const keepPend=VC.pend;
+async function vcRun(t){t=String(t||"").trim();if(!t||PARTNER()||STAFF)return;const keepPend=VC.pend;
   if(SAVE_RE.test(t)&&(VC.pend||dlg.open)){if(VC.pend){const p=VC.pend;VC.pend=null;await p.fn();VC={heard:t,say:"हो गया: "+p.l,done:[{l:p.l}],busy:false,err:""};if(_pan==="v")voiceUI();speak(VC.say);return}vcSave();return}
   if(/^(cancel|कैंसिल|रहने दो|नहीं|no|बंद करो)(?=$|[\s,.!।])/i.test(t)&&dlg.open){dlg.close();speak("ठीक है, बंद कर दिया।");return}VC={heard:t,say:"",done:[],busy:true,err:"",pend:null};if(_pan!=="v"&&!dlg.open){_pan="";pan("v");try{_rec&&_rec.stop()}catch(e){}}voiceUI();
   let r=null;if(!oaKey())await aiCloudLoad();
